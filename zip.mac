@@ -1,0 +1,2984 @@
+	TITLE	Infocom INTERLOGIC interpreter disassembly, 5/27/84
+
+; ***************************************************************************
+; *                                                                         *
+; *               Infocom INTERLOGIC interpreter disassembly                *
+; *                    Apple II/6502 version, release 3                     *
+; *                  As used in interactive fiction games                   *
+; *                                                                         *
+; *       The INTERLOGIC interpreter is copyrighted by Infocom, Inc.        *
+; *                                                                         *
+; *   This disassembly and the comments thereof are copyright (C) 1984 by   *
+; *                         Eric L. Smith                                   *
+; *                         230 South 500 West Suite 133                    *
+; *                         Salt Lake City, Utah  84101                     *
+; *                         (801) 582-3371                                  *
+; *                                                                         *
+; * This disassembly represents well over 300 hours of intense study.  It   *
+; * is intended for private, noncommercial use only.  Any comments or       *
+; * questions about it should be addressed to the above address.  There is  *
+; * no warranty, express or implied, as to the accuracy of this disassembly *
+; * or its fitness for any particular purpose.  I assume no liability for   *
+; * any damages, actual or alleged, direct or indirect, resulting from the  *
+; * use of, or inability to use this disassembly.                           *
+; *                                                                         *
+; ***************************************************************************
+
+	PAGE
+
+	.6502
+	.SALL
+	.SFCOND
+
+VERSN	EQU	0			; 0 is old version, 1 is new
+RNGDBG	EQU	0			; RNG debug
+LC40	EQU	0			; 40 column lower case
+
+; define memory usage
+
+LDORG	EQU	$0100			; where to load
+
+ZPORG	EQU	$7F			; origin of zero page usage
+BUFFER	EQU	$0200			; I/O buffer
+STCKMX	EQU	$E0			; maximum size of stack in words
+STCKLC	EQU	$03E8			; base address of stack (works down)
+STKLIM	EQU	STCKLC-2*STCKMX		; lower limit of stack
+
+PRTWDT	EQU	$0779			; printer carriage width
+
+	IFF	VERSN
+MAINOR	EQU	$0800			; origin of main program
+VMTORG	EQU	MAINOR+$1A00		; origin of virtual memory tables
+RWTSOR	EQU	VMTORG+$0200		; origin of RWTS routines
+FIRFLC	EQU	RWTSOR+$0800		; first location available
+LSTFLC	EQU	$C000-1			; last potential location available
+	ENDIF
+
+VMT1LC	EQU	VMTORG+$0000		; virtual memory page tables
+VMT2LC	EQU	VMTORG+$0080
+VMT3LC	EQU	VMTORG+$0100
+VMT4LC	EQU	VMTORG+$0180
+
+RWTS	EQU	RWTSOR+$0500		; entry point of RWTS routines
+
+
+; Control characters
+
+CRCHAR	EQU	$0D			; carriage return
+LFCHAR	EQU	$0A			; line feed
+TBCHAR	EQU	$09			; horizontal tab
+FFCHAR	EQU	$0C			; form feed
+
+
+; Apple monitor ROM's zero page locations
+
+WNDLFT	EQU	$20			; screen window parameters
+WNDWDT	EQU	$21
+WNDTOP	EQU	$22
+WNDBOT	EQU	$23
+
+CURSRH	EQU	$24			; cursor position
+CURSRV	EQU	$25
+
+INVFLG	EQU	$32			; inverse video flag
+
+PROMPT	EQU	$33			; line input prompt
+
+CSWL	EQU	$36			; character output vector
+
+RNDLOC	EQU	$4E			; location randomized by keyboard input
+
+
+; Apple monitor rotuines
+
+VTAB	EQU	$FC22			; adjust video pointer after cursor move
+HOME	EQU	$FC58			; clear screen window
+CLREOL	EQU	$FC9C			; clear to end of line
+RDKEY	EQU	$FD0C			; get a key from keyboard
+GETLN1	EQU	$FD6F			; get a line from keyboard
+COUT	EQU	$FDED			; output a char to current device
+COUT1	EQU	$FDF0			; output a char to screen
+
+	IFT	RNGDBG
+	ENDIF
+
+	PAGE
+; define our own zero page usage
+
+	DSECT
+	ORG	ZPORG
+
+SECPTK	DS	1			; number of sectors per track on disk
+
+OPCODE	DS	1			; opcode of current instruction
+ARGCNT	DS	1			; instruction arguments
+
+ARG1	DS	2
+ARG2	DS	2
+ARG3	DS	2
+ARG4	DS	2
+
+PRGIDX	DS	1			; PC low byte, index into page
+PRGLPG	DS	2			; PC logical page number
+PRGMPT	DS	2			; PC mem loc of logical page
+PRGUPD	DS	1			; PC new page flag
+PRGPPG	DS	1			; PC physical page number
+
+AUXLPG	DS	2			; AUX logical page number
+AUXIDX	DS	1			; AUX low byte, index into page
+AUXMPT	DS	2			; AUX mem loc of logical page
+AUXUPD	DS	1			; AUX new page flag
+AUXPPG	DS	1			; AUX physical page number
+
+GLBVAR	DS	2			; pointer to global variables
+LOCVAR	DS	30			; storage of local variables
+
+SWPMEM	DS	2			; address of first swappable page
+FRZMEM	DS	2			; address of first frozen page
+FRZPGS	DS	1			; number of frozen pages
+SWPPGS	DS	1			; number of swappable phys. pages
+
+MRUPAG	DS	1			; phys. pg. # of most recently used page
+LRUPAG	DS	1			; phys. pg. # of least recently used page
+
+VMTAB1	DS	2			; virtual memory table pointers
+VMTAB2	DS	2
+VMTAB3	DS	2
+VMTAB4	DS	2
+
+STKCNT	DS	1			; # items on stack
+STKPNT	DS	2			; stack pointer
+STKPSV	DS	2			; stack ptr save during call
+STKCSV	DS	1			; stack cnt save during call
+
+TMPMOD	DS	1			; string output temporary char. mode
+PRMMOD	DS	1			; string output perm. char. mode
+PNYBCN	DS	1			; string output nybble counter
+PNYBBF	DS	2			; string output nybble buffer
+
+INWORD	DS	6			; word to be packed
+
+LD9	DS	1
+
+PKWORD	DS	4			; packed word
+
+LDE	DS	1
+LDF	DS	1
+LE0	DS	1
+LE1	DS	1
+
+SBWDPT	DS	2
+
+ACB	DS	2
+ACC	DS	2
+ACD	DS	2
+
+MDFLAG	DS	1			; negative arg count for mul/div
+
+CHRPTR	DS	1			; char out buffer pointer
+CHRPT2	DS	1			; char out buffer pointer 2
+LINCNT	DS	1			; output line counter
+PRCSWL	DS	2			; CSWL vector contents for printer
+
+	DS	3
+
+STLTYP	DS	1			; status line type (time vs. score)
+
+	DEND
+
+	PAGE
+; define offsets into game header
+
+	DSECT
+	ORG	0
+
+HDRIRL	DS	1			; required interpreter release (should be 3)
+HDRTYP	DS	1			; game type flags (score/time, etc.)
+HDRREL	DS	2			; game release
+HDRFRZ	DS	2			; log. addr. of end of frozen memory
+HDRSTR	DS	2			; log. addr. of start of code
+HDRVCB	DS	2			; log. addr. of vocab. table
+HDRTHG	DS	2			; log. addr. of thing table
+HDRGBV	DS	2			; log. addr. of global variables
+HDRIMP	DS	2			; log. addr. of end of impure storage
+HDRFLG	DS	2			; flags (script, etc.)
+HDRSER	DS	6			; game serial no. (release data)
+HDRSBW	DS	2			; log. addr. of subword table
+HDRCKA	DS	2			; half of last log. addr. to checksum
+HDRCKV	DS	2			; expected checksum value
+
+
+; define thing table offsets
+
+	ORG	0
+
+THGATT	DS	4			; attribute bits
+THGPAR	DS	1			; parent thing number
+THGSIB	DS	1			; sibling thing number
+THGCHD	DS	1			; child thing number
+THGPRP	DS	2			; property list pointer
+
+	DEND
+
+	INCLUDE	ZIPMAC
+	PAGE
+; start of interpreter
+
+	ASEG
+	ORG	LDORG			; load at one address
+	.PHASE	MAINOR			; but assemble for another
+
+START:	CLD				; very important
+
+	LDA	#$00			; clear our section of zero page
+	LDX	#$80
+L0805:	STA	$00,X
+	IXBNE	L0805
+
+	LDX	#$FF			; init hardware stack
+	TXS
+
+	JSR	INITSC			; init and clear screen window
+
+	MOV	<#$00>,<PRGUPD,AUXUPD>	; indicate no pages loaded
+
+	MOV	<#$01>,STKCNT		; init software stack
+	DMOVI	STCKLC,STKPNT
+
+	MOV	<#$FF>,LD9
+
+	DMOVI	VMT1LC,VMTAB1		; init virtual memory table pointers
+	DMOVI	VMT2LC,VMTAB2
+	DMOVI	VMT3LC,VMTAB3
+	DMOVI	VMT4LC,VMTAB4
+
+	LDY	#$00			; init virtual memory tables
+	LDX	#$80
+L084A:	MOV	<#$FF>,<<(VMTAB1),Y>,<(VMTAB2),Y>>
+	TYA
+	ADD	,<#$01>,<<(VMTAB3),Y>>
+	TYA
+	SUB	,<#$01>,<<(VMTAB4),Y>>
+	INY
+	DXBNE	L084A
+	DEY
+	MOV	<#$FF>,<<(VMTAB3),Y>>
+
+	MOV	<#$00>,MRUPAG
+	MOV	<#$7F>,LRUPAG
+
+	DMOVI	FIRFLC,FRZMEM		; init memory pointers
+
+	DMOV	FRZMEM,ACC		; read log page 0 to first frozen page
+	DMOVI	$0000,ACB
+	JSR	DRDBKF
+
+	LDY	#HDRFRZ+1		; setup frozen storage page count
+	MOV	<#$FF>,<<(FRZMEM),Y>>	; bump up to page boundary - 1
+	DEY
+	MOV	<(FRZMEM),Y>,FRZPGS
+	INC	FRZPGS
+
+	LDA	#$00			; read in rest of frozen memory
+L0897:	ADD	,<#$01>
+	TAX
+	ADC	FRZMEM+1
+	STA	ACC+1
+	MOV	FRZMEM,ACC
+	TXA
+	CMPBE	FRZPGS,L08B6
+	PHA
+	STA	ACB
+	MOV	<#$00>,ACB+1
+	JSR	DRDBKF
+	PLA
+	JMP	L0897
+
+L08B6:	LDY	#HDRTYP			; setup for proper type of statu sline
+	LDA	(FRZMEM),Y
+	AND	#$02
+	STA	STLTYP
+
+	LDY	#HDRSTR+1		; init PC
+	MOV	<(FRZMEM),Y>,PRGIDX
+	DEY
+	MOV	<(FRZMEM),Y>,PRGLPG
+	MOV	<#$00>,PRGLPG+1
+
+	LDY	#HDRGBV+1		; init global variable pointer
+	MOV	<(FRZMEM),Y>,GLBVAR
+	DEY
+	ADD	<(FRZMEM),Y>,FRZMEM+1,GLBVAR+1
+
+	LDY	#HDRSBW+1		; init sub-word table pointer
+	MOV	<(FRZMEM),Y>,SBWDPT
+	DEY
+	ADD	<(FRZMEM),Y>,FRZMEM+1,SBWDPT+1
+
+	MOV	<#$00>,SWPMEM		; swpmem := frzmem + 256 * frzpgs
+	ADD	FRZPGS,FRZMEM+1,SWPMEM+1
+
+	JSR	FNDMEM			; determine nnumber of pages of memory
+	SUB	,SWPMEM+1		; swppgs := (maxmem - swpmem) / 256
+	BCC	L090A			; if swppgs < 0 then fatal error
+	TAY
+	INY
+	STY	SWPPGS
+	TAY
+	STY	LRUPAG
+	MOV	<#$FF>,<<(VMTAB3),Y>>
+
+	JMP	MNLOOP			; start the game!
+
+L090A:	JSR	FATAL
+
+	PAGE
+; class C instructions (implicit or no operand)
+
+OPTAB1:	DW	OPRTNT			; return with TRUE
+	DW	OPRTNF			; return with FALSE
+	DW	OPPSI			; print string immediate
+	DW	OPPSIC			; print string immediate, CRLF, return true
+	DW	OPNULL			; no-op
+	DW	OPSVGM			; save game status to disk
+	DW	OPRSGM			; restore game status from disk
+	DW	START			; restart game
+	DW	OPRTNV			; return with value
+	DW	PULLWD			; drop a word from the stack
+	DW	OPENDS			; end the game
+	DW	OPCRLF			; print CRLF
+	DW	OPPRST			; print status line
+	DW	OPCKSM			; checksum the program
+OPMAX1	EQU	(*-OPTAB1)/2
+
+
+; class B instructions (single operand)
+
+OPTAB2:	DW	OPTSTZ			; compare ARG1=0 (ARG1<>0)
+	DW	OPGTSB			; get thing's sibling
+	DW	OPGTCH			; get thing's child
+	DW	OPGTPR			; get thing's parent
+	DW	OPGTPL			; get length of property (given addr)
+	DW	OPINC			; increment variable
+	DW	OPDEC			; decrement variable
+	DW	OPPSB			; print string at byte address
+	DW	FATAL
+	DW	OPDSTT			; destroy thing
+	DW	OPPRTN			; print thing name
+	DW	OPRTN			; return
+	DW	OPJUMP			; unconditional jump
+	DW	OPPSW			; print string at word address
+	DW	OPMOVE			; move var ARG1 to var
+	DW	OPNOT			; 1's complement
+OPMAX2	EQU	(*-OPTAB2)/2
+
+	PAGE
+; class A instructions (variable number of operands, may use short form
+; opcode)
+
+OPTAB3:	DW	FATAL
+	DW	OPMTCH			; match ARG1 against ARG2, ARG3, or ARG4
+	DW	L0EB7			; ??? compare ARG1<=ARG2 (ARG1>ARG2)
+	DW	L0ECF			; ??? compare ARG1>=ARG2 (ARG1<ARG2)
+	DW	OPDECB			; decrement variable and branch
+	DW	OPINCB			; increment variable and branch
+	DW	OPTINT			; is thing ARG1 in thing ARG2
+	DW	L0F23
+	DW	OPOR			; logical OR
+	DW	OPAND			; logical AND
+	DW	OPTSTA			; test thing attribute
+	DW	OPSETA			; set thing attribute
+	DW	OPCLRA			; clear thing attribute
+	DW	L0F97			; move ARG2 into var ARG1
+	DW	OPMOVT			; move thing ARG1 into thing ARG2
+	DW	OPGTWD			; get a word
+	DW	OPGTBY			; store a word
+	DW	OPGTP			; get thing property
+	DW	OPGTPA			; get address of property
+	DW	OPGTNP			; get next property
+	DW	OPADD			; add
+	DW	OPSUB			; subtract
+	DW	OPMUL			; multiply
+	DW	OPDIV			; divide
+	DW	OPRMD			; remainder
+OPMAX3	EQU	(*-OPTAB3)/2
+
+
+; class D instructions (variable number of operands)
+
+OPTAB4:	DW	OPCALL			; call procedure
+	DW	OPPTWD			; store a word
+	DW	OPPTBY			; store a byte
+	DW	OPPTP			; store into thing property
+	DW	OPGTLN			; get a line of input
+	DW	OPPRCH			; print a character
+	DW	OPPRNM			; print number
+	DW	OPRNDM			; generate random number
+	DW	OPPUSH			; push ARG1 to stack
+	DW	OPPULL			; pull var from stack
+OPMAX4	EQU	(*-OPTAB4)/2
+
+	PAGE
+
+MNLOOP:	MOV	<#$00>,ARGCNT		; default no arguments
+
+	JSR	FTPRBA			; get opcode
+	STA	OPCODE
+
+	CMPJL	#$80,OPCGPA		; is it class A ($00-$7F)?
+	CMPJL	#$B0,OPCGPB		; how about class B ($80-$AF)?
+	CMPBL	#$C0,OPCGPC		; perhaps class C ($B0-$BF)?
+;	JMP	OPCGPD			; nope, it's class D ($C0-$FF).
+
+
+; process opcode group D ($C0-$FF)
+
+OPCGPD:	JSR	FTPRBA			; get operand specification byte
+
+	LDX	#$00			; init operand count
+
+L09AF:	PHA	 			; save the operand specification byte
+	TAY				;   in Y and on stack
+
+	TXA				; save operand count on stack
+	PHA
+
+	TYA				; get back operand specification byte
+	AND	#$C0			; look at top two bits
+
+	JSREQ	FTPRWD,L09D7		; if they're 00, operand is word immed.
+	CMPJSE	#$80,<GTVARP,L09D7>	; 10? variable
+	CMPJSE	#$40,<FTPRBY,L09D7>	; 01? byte immediate
+
+	PLA				; must be 11, no more operands
+	PLA				; pull operand spec byte and count
+	JMP	L09ED			; and finish up
+
+L09D7:	PLA				; get operand count back
+	TAX				; to use as index
+
+	MOV	ACC,<<ARG1,X>>		; store operand in proper ARG locatoin
+	MOV	ACC+1,<<ARG1+1,X>>
+
+	INX				; increment ARG pointer
+	INX
+	INC	ARGCNT			; and count
+
+	PLA				; pull arg spec byte
+	SEC				; shift top two bits off left, while
+	ROL	A			; shifting 11 in from right (to
+	SEC				; indicate no more operands)
+	ROL	A
+
+	JMP	L09AF			; try for another
+
+L09ED:	DMOVI	OPTAB4,ACC		; assume class D
+	LDA	OPCODE			; but if it's $C0-$DF then it's class A
+	CMPJL	#$E0,L0A98
+
+	SBC	#$E0			; adjust to $00..$1F
+	CMPBG	#OPMAX4,L0A2B		; make sure it's not illegal
+
+GODOIT:	ASL	A			; get address from table (base in ACC)
+	TAY				;   word indexed by A and execute
+	MOV	<(ACC),Y>,DSPTCH+1
+	INY
+	MOV	<(ACC),Y>,DSPTCH+2
+DSPTCH:	JSR	DSPTCH
+	JMP	MNLOOP
+
+
+; process opcode group C ($80-$BF)
+
+OPCGPC:	SUB	,<#$B0>			; adjust to $00..$0F
+	CMPBG	#OPMAX1,L0A2B		; make sure it's not illegal
+	PHA				; save it temp.
+	DMOVI	OPTAB1,ACC		; get base address of proper table
+	PLA
+	JMP	GODOIT
+
+L0A2B:	JSR	FATAL			; oops!  illegal opcode
+
+
+; process opcode group B ($80-$AF)
+
+OPCGPB:	AND	#$30			; mask off operand type bits
+
+	JSREQ	FTPRWD,L0A45		; 00?  then it's word immediate
+	CMPJSE	#$10,<FTPRBY,L0A45>	; 01?  byte immediate
+	JSR	GTVARP			; must be 10, variable
+
+L0A45:	MOV	<#$01>,ARGCNT		; one argument
+	DMOV	ACC,ARG1
+
+	LDA	OPCODE			; adjust opcode to $00..$0F
+	AND	#$0F
+	CMPBG	#OPMAX2,L0A2B		; make sure it's not illegal
+	PHA				; save tmep.
+	DMOVI	OPTAB2,ACC		; get appropriate table base addr
+	PLA
+	JMP	GODOIT			; and go do it!
+
+
+; process opcode group A ($00-$7F)
+
+OPCGPA:	AND	#$40			; get type bit for ARG1
+	JSREQ	FTPRBY,L0A73		; 0:  byte immediate
+	JSR	GTVARP			; 1:  variable/stack
+L0A73:	DMOV	ACC,ARG1		; save it
+
+	LDA	OPCODE			; get type bit for ARG2
+	AND	#$20
+	JSREQ	FTPRBY,L0A8A		; 0:  byte immediate
+	JSR	GTVARP			; 1:  variable/stack
+L0A8A:	DMOV	ACC,ARG2		; save it
+
+	MOV	<#$02>,ARGCNT		; indicate two operands
+
+	LDA	OPCODE			; get opcode back
+L0A98:	AND	#$1F			; adjust to $00..$1F
+	CMPBG	#OPMAX3,L0A2B		; make sure it's not illegal
+	PHA				; save temp.
+	DMOVI	OPTAB3,ACC		; get base addr of appropriate table
+	PLA
+	JMP	GODOIT			; and go do it!
+
+	PAGE
+; fetch byte immediate into ACC
+
+FTPRBY:	JSR	FTPRBA			; get a byte form program into A
+	STA	ACC			; sero-fill to 16 bits in ACC
+	MOV	<#$00>,ACC+1
+	RTS				; return
+
+
+; fetch word immediate into ACC
+
+FTPRWD:	JSR	FTPRBA			; get high byte from program into A
+	PHA				; save it temp.
+	JSR	FTPRBA			; get low byte from program into A
+	STA	ACC			; store low byte
+	PUL	ACC+1			; store high byte
+	RTS				; return
+
+
+GTVRA1:	TSTABE	L0AD0			; fetch ACC from var in A, keep if stack
+	JMP	GTVARA
+
+
+PTVRA1:	TSTABE	L0AD6			; store ACC into var in A, replace if stack
+	JMP	PTVARA
+
+L0AD0:	JSR	PULLWD			; read stack non-destructive
+	JMP	PUSHWD
+
+L0AD6:	DPSH	ACC			; replace TOS w/ ACC
+	JSR	PULLWD
+	DPUL	ACC
+	JMP	PUSHWD
+
+	PAGE
+GTVARP:	JSR	FTPRBA			; fetch ACC from var ind. by program
+	TSTABE	L0B26
+GTVARA:	CMPBG	<#$10>,L0B02		; fetch ACC from var in A
+	SUB	,<#$01>
+	ASL	A
+	TAX
+	MOV	<LOCVAR,X>,ACC+1
+	INX
+	MOV	<LOCVAR,X>,ACC
+	RTS
+
+L0B02:	SUB	,<#$10>
+	ASL	A
+	STA	ACB
+	LDA	#$00
+	ROL	A
+	STA	ACB+1
+	DADD	GLBVAR,ACB,ACB
+	LDY	#$00
+	MOV	<(ACB),Y>,ACC+1
+	INY
+	MOV	<(ACB),Y>,ACC
+	RTS
+
+L0B26:	JSR	PULLWD
+	RTS
+
+	PAGE
+PTVRPZ:	LDA	#$00			; store 0 in var. ind. by program
+PTVRPA:	STA	ACC			; store byte in A in var. ind. by prog.
+	MOV	<#$00>,ACC+1
+PTVRP1:	JMP	PTVARP			; unnecessary!!!
+
+PTVARP:	DPSH	ACC			; store ACC in var. ind. by program
+	JSR	FTPRBA
+	TAX
+	DPUL	ACC
+	TXA
+PTVARA:	TSTAJE	PUSHWD			; store ACC in var. in A
+	CMPBG	<#$10>,L0B60
+	DECA
+	ASL	A
+	TAX
+	MOV	ACC+1,<<LOCVAR,X>>
+	INX
+	MOV	ACC,<<LOCVAR,X>>
+	RTS
+
+L0B60:	SUB	,<#$10>
+	ASL	A
+	STA	ACB
+	LDA	#$00
+	ROL
+	STA	ACB+1
+	DADD	GLBVAR,ACB,ACB
+	LDY	#$00
+	MOV	ACC+1,<<(ACB),Y>>
+	INY
+	MOV	ACC,<<(ACB),Y>>
+	RTS
+
+	PAGE
+PREDTR:	JSR	FTPRBA			; fetch first displacement byte
+	TSTABM	L0B9C			; complement condition if necessary
+	BPL	L0B94
+
+PREDFL:	JSR	FTPRBA			; fetch first displacement byte
+	TSTABP	L0B9C			; complement condition if necessary
+;	BMI	L0B94
+
+L0B94:	AND	#$40			; branch not taken
+	JSREQ	FTPRBA			; fetch second displacement byte if
+	RTS				; necessary and discard it
+
+L0B9C:	TAX				; branch take, save first disp. byte
+	AND	#$40			; do we need a second byte?
+	BEQ	L0BAD			; yes
+	TXA				; no, extend what we have w/ zeros
+	AND	#$3F
+	STA	ACC
+	MOV	<#$00>,ACC+1
+	JMP	L0BC3			; and go do it!
+
+L0BAD:	TXA				; get rest of displacement
+	AND	#$3F
+	PHA
+	JSR	FTPRBA
+	STA	ACC
+	PUL	ACC+1
+	AND	#$20
+	BEQ	L0BC3
+	LDA	ACC+1
+	ORA	#$C0
+	STA	ACC+1
+
+L0BC3:	DTSTBE	ACC,OPRTNF		; if displacement = 0, return false
+	DDEC	ACC
+	DTSTBE	ACC,OPRTNT		; if displacement = 1, return true
+L0BDA:	DDEC	ACC
+
+	MOV	ACC+1,ACB		; copy high byte of displacement to ACB
+	ASL	A			; and sign extend to 17 bits
+	LDA	#$00
+	ROL	A
+	STA	ACB+1
+
+	ADD	PRGIDX,ACC		; add low byte of displacement to PC
+	BCC	L0BFC			; increment high 8 bits of displacement
+	DINC	ACB			;   if overflow
+L0BFC:	STA	PRGIDX
+
+	DTSTBE	ACB,L0C17		; if high 9 bits of disp. =0, all done
+
+	CLC				; add hgih 9 bits of disp. to PC log page
+	LDA	ACB
+	ADC	PRGLPG
+	STA	PRGLPG
+	LDA	ACB+1
+	ADC	PRGLPG+1
+	AND	#$01			; mod 2^17
+	STA	PRGLPG+1
+
+	MOV	<#$00>,PRGUPD		; indicate page chagne
+
+L0C17:	RTS				; all done
+
+	PAGE
+OPRTNT:	LDA	#$01			; return true ($01)
+L0C1A:	STA	ARG1			; return byte in A
+	MOV	<#$00>,ARG1+1		; make high byte of return value $00
+	JMP	OPRTN			; and do the return
+
+OPRTNF:	LDA	#$00			; return false ($00)
+	JMP	L0C1A
+
+
+OPPSI:	MOV	PRGIDX,AUXIDX		; copy PC to AUX
+	DMOV	PRGLPG,AUXLPG
+	MOV	<#$00>,AUXUPD		; indicate new log. page
+
+	JSR	PRNTST			; print the string
+
+	MOV	AUXIDX,PRGIDX		; copy AUX back to PC
+	DMOV	AUXLPG,PRGLPG
+	MOV	AUXUPD,PRGUPD
+	DMOV	AUXMPT,PRGMPT
+
+OPNULL:	RTS				; done
+
+
+OPPSIC:	JSR	OPPSI			; print string immediate
+
+	LDA	#CRCHAR			; print CRLF (could use JSR OPCRLF)
+	JSR	BFCHAR
+	LDA	#LFCHAR
+	JSR	BFCHAR
+
+	JMP	OPRTNT			; return true
+
+
+OPRTNV:	JSR	PULLWD			; pull value off stack
+	DMOV	ACC,ARG1		; save it for posterity
+	JMP	OPRTN			; return with it
+
+
+OPCRLF:	LDA	#CRCHAR			; print CRLF
+	JSR	BFCHAR
+	LDA	#LFCHAR
+	JMP	BFCHAR			; implicit RTS
+
+	PAGE
+OPCKSM:	LDY	#HDRCKA+1		; get checksum end log. address (word
+	MOV	<(FRZMEM),Y>,ARG2	;   index)
+	DEY
+	MOV	<(FRZMEM),Y>,ARG2+1
+
+	MOV	<#$00>,<ARG3,ARG1,ARG1+1,ACC+1,ARG4>	; initialize everything
+
+	MOV	<#ARG4>,L1807+1		; patch VM routine to swap  in all pages
+
+	ASL	ARG2			; convert end address to byte index
+	ROL	ARG2+1
+	ROL	ARG3
+
+	MOV	<#$40>,ACC		; start at log. address $00040
+	JSR	SETAXB
+
+L0CA5:	JSR	FTAXBA			; get a byte
+	DADDB2	ARG1			;   and add it to checksum
+
+	LDA	AUXIDX			; compare AUX to end address
+	CMPBN	ARG2,L0CA5		; if not done, loop
+	LDA	AUXLPG
+	CMPBN	ARG2+1,L0CA5
+	LDA	AUXLPG+1
+	CMPBN	ARG3,L0CA5
+
+	MOV	<#FRZPGS>,L1807+1	; unpatch VM routine
+
+	LDY	#HDRCKV+1		; compare computed vs. expected checksum
+	LDA	(FRZMEM),Y
+	CMPBN	ARG1,L0CDA
+	DEY
+	LDA	(FRZMEM),Y
+	CMPJE	ARG1+1,PREDTR
+
+L0CDA:	JMP	PREDFL
+
+	PAGE
+OPTSTZ:	DTSTJN	ARG1,PREDFL
+L0CE6:	JMP	PREDTR
+
+OPGTSB:	LDA	ARG1			; get sibling of thing, predicate
+	JSR	SETUPT
+	LDY	#THGSIB
+	JMP	L0CFA
+
+OPGTCH:	LDA	ARG1			; get child of thing, predicate
+	JSR	SETUPT
+	LDY	#THGCHD
+L0CFA:	PSH	<<(ACC),Y>>
+	STA	ACC
+	MOV	<#$00>,ACC+1
+	JSR	PTVARP
+	PLA
+	TSTABN	L0CE6
+	JMP	PREDFL
+
+OPGTPR:	LDA	ARG1			; get parent of thing
+	JSR	SETUPT
+	LDY	#THGPAR
+	MOV	<(ACC),Y>,ACC
+	MOV	<#$00>,ACC+1
+	JMP	PTVRP1
+
+OPGTPL:	DADD	ARG1,FRZMEM,ACC
+	DDEC	ACC
+	LDY	#$00
+	JSR	GTPLEN
+	ADD	,<#$01>
+	JMP	PTVRPA
+
+
+; increment variable ARG1
+OPINC:	LDA	ARG1
+	JSR	GTVRA1
+	DINC	ACC
+L0D4E:	DPSH	ACC
+	LDA	ARG1
+	JSR	PTVRA1
+	DPUL	ACC
+	RTS
+
+
+; decrement variable ARG1
+
+OPDEC:	LDA	ARG1
+	JSR	GTVRA1
+	DDEC	ACC
+	JMP	L0D4E
+
+
+; print string at byte address in ARG1
+
+OPPSB:	DMOV	ARG1,ACC		; set AUX to point to string at
+	JSR	SETAXB			;   byte address
+	JMP	L0E9D			; and print it!
+
+	PAGE
+; destroy thing ARG1 (move to location 0)
+
+OPDSTT:	LDA	ARG1
+	JSR	SETUPT
+	LDY	#THGPAR
+	LDA	(ACC),Y
+	RTSEQ
+	TAX
+	DPSH	ACC
+	TXA
+	JSR	SETUPT
+	LDY	#THGCHD
+	LDA	(ACC),Y
+	CMPBN	ARG1,L0DB7
+	DPUL	ACB
+	DPSH	ACB
+	LDY	#THGSIB
+	LDA	(ACB),Y
+	LDY	#THGCHD
+	STA	(ACC),Y
+	JMP	L0DD2
+L0DB7:	JSR	SETUPT
+	LDY	#THGSIB
+	LDA	(ACC),Y
+	CMPBN	ARG1,L0DB7
+	DPUL	ACB
+	DPSH	ACB
+	MOV	<(ACB),Y>,<<(ACC),Y>>
+L0DD2:	DPUL	ACC
+	LDY	#THGPAR
+	MOV	<#$00>,<<(ACC),Y>>
+	INY				; to THGSIB
+	STA	(ACC),Y
+	RTS
+
+	PAGE
+OPPRTN:	LDA	ARG1			; print thing name
+L0DE4:	JSR	SETUPT			; set up pointer to thing
+
+	LDY	#THGPRP			; get address of thing's property list
+	MOV	<(ACC),Y>,ACB+1
+	INY
+	MOV	<(ACC),Y>,ACB
+	DMOV	ACB,ACC
+
+	DINC	ACC			; skip name length byte
+
+	JSR	SETAXB			; set AUX to point to it
+	JMP	PRNTST			; and print it and return
+
+	PAGE
+
+OPRTN:	DMOV	STKPSV,STKPNT		; restore pre-call stack pointer, count
+	MOV	STKCSV,STKCNT
+
+	JSR	PULLWD			; are there any local variables to restore?
+	LDA	ACC
+	BEQ	L0E4C			; no, skip it
+
+	DMOVI	LOCVAR-2,ACB		; yes, calc. addr. of last var to restore
+	MOV	ACC,ACD
+	ASL	A
+	DADDB2	ACB
+
+L0e2F:	JSR	PULLWD			; pull the value of the var
+	LDY	#$01			; store it in the var
+	MOV	ACC,<<(ACB),Y>>
+	DEY
+	MOV	ACC+1,<<(ACB),Y>>
+	DDEC2	ACB			; decrement the var pointer
+	DECBN	ACD,L0E2F		; and the count and loop if more to do
+
+L0E4C:	JSR	PULLWD			; pull the PC log. page
+	DMOV	ACC,PRGLPG
+
+	JSR	PULLWD			; pull the stack pointer save
+	DMOV	ACC,STKPSV
+
+	JSR	PULLWD			; pull the stack count save and PC
+	MOV	ACC+1,PRGIDX		; low byte
+	MOV	ACC,STKCSV
+
+	MOV	<#$00>,PRGUPD		; indicate need to locate new page
+
+	DMOV	ARG1,ACC		; store the return value and return
+	JMP	PTVRP1
+
+	PAGE
+; jump to address ARG1
+
+OPJUMP:	DMOV	ARG1,ACC		; setup to jump into middle of
+	DDEC	ACC			; predicate routine
+	JMP	L0BDA			; and do it!
+
+
+OPPSW:	DMOV	ARG1,ACC		; set AUX to point to string at
+	JSR	SETAXW			;   word address
+L0E9D:	JMP	PRNTST			; and print it!
+
+
+OPMOVE:	LDA	ARG1			; get number of first variable
+	JSR	GTVRA1			; get its contents
+	JMP	PTVRP1			; store into another variable
+
+
+OPNOT:	D1COMP	ARG1,ACC
+	JMP	PTVRP1
+
+L0EB7:	DMOV	ARG1,ACC
+	DMOV	ARG2,ACB
+	JSR	L16DE
+	BCC	L0F10
+	JMP	PREDFL
+
+L0ECF:	DMOV	ARG1,ACB
+	DMOV	ARG2,ACC
+	JSR	L16DE
+	BCC	L0F10
+	JMP	PREDFL
+
+OPDECB:	JSR	OPDEC
+	DMOV	ARG2,ACB
+	JMP	L0F08
+
+OPINCB:	JSR	OPINC
+	DMOV	ACC,ACB
+	DMOV	ARG2,ACC
+L0F08:	JSR	L16DE
+	JCS	PREDFL
+L0F10:	JMP	PREDTR
+
+OPTINT:	LDA	ARG1
+	JSR	SETUPT
+	LDY	#$04
+	LDA	ARG2
+	CMPBE	<(ACC),Y>,L0F10
+	JMP	PREDFL
+
+L0F23:	MOV	ARG2+1,ACC+1
+	AND	ARG1+1
+	STA	ACB+1
+	MOV	ARG2,ACC
+	AND	ARG1
+	STA	ACB
+	JSR	L16E9
+	BEQ	L0F10
+	JMP	PREDFL
+
+OPOR:	DOR	ARG2,ARG1,ACC
+	JMP	PTVRP1
+
+OPAND:	DAND	ARG2,ARG1,ACC
+	JMP	PTVRP1
+
+	PAGE
+; test attribute bit ARG2 of thing ARG1
+
+OPTSTA:	JSR	SETUPA
+	LDA	ACB+1
+	AND	ACD+1
+	STA	ACB+1
+	LDA	ACB
+	AND	ACD
+	ORA	ACB+1
+	BNE	L0F10
+	JMP	PREDFL
+
+
+; set attribute bit ARG2 of thing ARG1
+
+OPSETA:	JSR	SETUPA
+	LDY	#$01
+	LDA	ACB
+	ORA	ACD
+	STA	(ACC),Y
+	DEY
+	LDA	ACB+1
+	ORA	ACD+1
+	STA	(ACC),Y
+	RTS
+
+
+; clear attribute bit ARG2 of thing ARG1
+
+OPCLRA:	JSR	SETUPA
+	LDY	#$01
+	LDA	ACD
+	EOR	#$FF
+	AND	ACB
+	STA	(ACC),Y
+	DEY
+	LDA	ACD+1
+	EOR	#$FF
+	AND	ACB+1
+	STA	(ACC),Y
+	RTS
+
+	PAGE
+L0F97:	DMOV	ARG2,ACC
+	LDA	ARG1
+L0FA1:	JMP	PTVRA1
+
+OPMOVT:	JSR	OPDSTT
+	LDA	ARG1
+	JSR	SETUPT
+	DPSH	ACC
+	LDY	#THGPAR
+	MOV	ARG2,<<(ACC),Y>>
+	JSR	SETUPT
+	LDY	#THGCHD
+	LDA	(ACC),Y
+	TAX
+	MOV	ARG1,<<(ACC),Y>>
+	DPUL	ACC
+	TXA
+	BEQ	L0FD1
+	LDY	#THGSIB
+	STA	(ACC),Y
+L0FD1:	RTS
+
+OPGTWD:	DASL	ARG2
+	DADD	ARG2,ARG1,ACC
+	JSR	SETAXB
+	JSR	FTAXWD
+	JMP	PTVRP1
+
+OPGTBY:	DADD	ARG2,ARG1,ACC
+	JSR	SETAXB
+	JSR	FTAXBA
+	STA	ACC
+	MOV	<#$00>,ACC+1
+	JMP	PTVRP1
+
+	PAGE
+; get property ARG2 of thing ARG1
+
+OPGTP:	JSR	SETUPP
+L100B:	JSR	GTPNUM
+	CMPBE	ARG2,L103B
+	JSRCS	ADVPPT,L100B
+	LDY	#HDRTHG+1
+	CLC
+	LDA	(FRZMEM),Y
+	ADC	FRZMEM
+	STA	ACB
+	DEY
+	LDA	(FRZMEM),Y
+	ADC	FRZMEM+1
+	STA	ACB+1
+	LDA	ARG2
+	ASL	A
+	TAY
+	DEY
+	MOV	<(ACB),Y>,ACC
+	DEY
+	MOV	<(ACB),Y>,ACC+1
+	JMP	PTVRP1
+L103B:	JSR	GTPLEN
+	INY
+	CMPBE	<#$00>,L105E
+	CMPJSN	<#$01>,FATAL
+	MOV	<(ACC),Y>,ACB+1
+	INY
+	MOV	<(ACC),Y>,ACB
+	DMOV	ACB,ACC
+	JMP	PTVRP1
+L105E:	MOV	<(ACC),Y>,ACC
+	MOV	<#$00>,ACC+1
+	JMP	PTVRP1
+
+	PAGE
+; get address of property ARG2 of thing ARG1
+
+OPGTPA:	JSR	SETUPP
+L106C:	JSR	GTPNUM
+	CMPBE	ARG2,L107E
+	JCC	PTVRPZ
+	JSR	ADVPPT
+	JMP	L106C
+L107E:	DINC	ACC
+	CLC
+	TYA
+	ADC	ACC
+	STA	ACC
+	BCC	L10BE
+	INC	ACC+1
+L10BE:	DSUB	ACC,FRZMEM,ACC
+	JMP	PTVRP1
+
+	PAGE
+; get number of next property of thing ARG1 after property ARG2
+
+OPGTNP:	JSR	SETUPP
+	LDA	ARG2
+	BEQ	L10B7
+L10A5:	JSR	GTPNUM
+	CMPBE	ARG2,L10BD
+	JCC	PTVRPZ
+	JSR	ADVPPT
+	JMP	L10A5
+L10B7:	JSR	GTPNUM
+	JMP	PTVRPA
+L10BD:	JSR	ADVPPT
+	JMP	L10B7
+
+	PAGE
+; add ARG1 and ARG2
+
+OPADD:	DADD	ARG1,ARG2,ACC
+	JMP	PTVRP1
+
+
+; subtract ARG2 from ARG1
+
+OPSUB:	DSUB	ARG1,ARG2,ACC
+	JMP	PTVRP1
+
+
+; multiply ARG1 by ARG2
+
+OPMUL:	DMOV	ARG1,ACC
+	DMOV	ARG2,ACB
+	JSR	L15FB
+	LDA	ACB+1
+	BNE	L1104
+	LDA	ACB
+	CMPBE	<#$02>,L1111
+	CMPBE	<#$04>,L110D
+L1104:	JSR	L1568
+L1107:	JSR	L160A
+	JMP	PTVRP1
+L110D:	DASL	ACC
+L1111:	DASL	ACC
+	JMP	L1107
+
+	PAGE
+; divide ARG1 by ARG2
+
+OPDIV:	DMOV	ARG1,ACC
+	DMOV	ARG2,ACB
+	JSR	L15FB
+	LDA	ACB+1
+	BNE	L1139
+	LDA	ACB
+	CMPBE	<#$02>,L1143
+	CMPBE	<#$04>,L113F
+L1139:	JSR	DIVIDE
+	JMP	L1107
+L113F:	DLSR	ACC
+L1143:	DLSR	ACC
+	JMP	L1107
+
+
+; get remainder of ARG1 divided by ARG2
+
+OPRMD:	DMOV	ARG1,ACC
+	DMOV	ARG2,ACB
+	JSR	L15FB
+	JSR	DIVIDE
+	DMOV	ACB,ACC
+	JMP	PTVRP1
+
+	PAGE
+; test whether ARG1 is equal to any of the other args
+
+OPMTCH:	LDX	ARGCNT
+	DXBNE	L1173
+	JSR	FATAL
+L1173:	LDA	ARG1
+	CMPBN	ARG2,L117F
+	LDA	ARG1+1
+	CMPBE	ARG2+1,L11A0
+L117F:	DXBEQ	L119D
+	LDA	ARG1
+	CMPBN	ARG3,L118E
+	LDA	ARG1+1
+	CMPBE	ARG3+1,L11A0
+L118E:	DXBEQ	L119D
+	LDA	ARG1
+	CMPBN	ARG4,L1173
+	LDA	ARG1+1
+	CMPBE	ARG4+1,L11A0
+L119D:	JMP	PREDFL
+L11A0:	JMP	PREDTR
+
+	PAGE
+; call procedure at addr. ARG1 and optionally pass ARG2, ARG3, and ARG4
+; as arguments
+
+OPCALL:	DTS2BN	ARG1,L11B4		; if argument 1 (call address/2) is
+	DMOVI	$0000,ACC		; zero, just put zero in var
+	JMP	PTVRP1			; these three lines could be replaced
+					; with "DTS2BE PTVRPZ"
+
+L11B4:	MOV	STKCSV,ACC		; push the stack count save and low byte
+	MOV	PRGIDX,ACC+1		; of the PC
+	JSR	PUSHWD
+
+	DMOV	STKPSV,ACC		; push the stack pointer save
+	JSR	PUSHWD
+
+	DMOV	PRGLPG,ACC		; push the PC logical page
+	JSR	PUSHWD
+
+	MOV	<#$00>,PRGUPD		; indicate need to search for new page
+
+	DASL	ARG1,PRGIDX		; make new PC := ARG1 * 2
+	LDA	#$00
+	ROL	A
+	STA	PRGLPG+1
+
+	JSR	FTPRBA			; get first byte of routine
+	PHA				; and save it
+
+	TSTABE	L1220			; if it's zero, no local variables
+
+; push the local variables the routine will use
+
+	LDX	#$00
+L11F2:	PHA
+	MOV	<LOCVAR,X>,ACC+1
+	INX
+	MOV	<LOCVAR,X>,ACC
+	DEX
+	TXA
+	PHA
+	JSR	PUSHWD
+	JSR	FTPRBA
+	PHA
+	JSR	FTPRBA
+	STA	ACC
+	PUL	ACC+1
+	PLA
+	TAX
+	MOV	ACC+1,<<LOCVAR,X>>
+	INX
+	MOV	ACC,<<LOCVAR,X>>
+	INX
+	PLA
+	SUB	,<#$01>
+	BNE	L11F2
+
+L1220:	MOV	ARGCNT,ACD		; do we pass any parameters?
+	DECBE	ACD,L124C		; no
+
+	MOV	<#$00>,ACB		; yes, copy them in
+	MOV	<#$00>,ACC
+L1230:	LDX	ACB
+	LDA	ARG2+1,X
+	LDX	ACC
+	STA	LOCVAR,X
+	INC	ACC
+	LDX	ACB
+	LDA	ARG2,X
+	LDX	ACC
+	STA	LOCVAR,X
+	INC	ACC
+	INC	ACB
+	INC	ACB
+
+	DECBN	ACD,L1230		; loop if more parameters to pass
+
+L124C:	PUL	ACC			; get first porgram byte again
+	JSR	PUSHWD			; and push it so return can restore
+					; the local variables
+
+	MOV	STKCNT,STKCSV		; save the stack pointer and count
+	DMOV	STKPNT,STKPSV
+
+	RTS				; all done!
+
+	PAGE
+; store word ARG3 at log. addr. ARG2 (offset) * 2 + ARG1 (base)
+; should have test to insure no overrun of end of frozen storage!
+
+OPPTWD:	LDA	ARG2			; calculate logical address
+	ASL	A
+	ROL	ARG2+1
+	CLC
+	ADC	ARG1
+	STA	ACC
+	LDA	ARG2+1
+	ADC	ARG1+1
+	STA	ACC+1
+
+	DADD	ACC,FRZMEM,ACC		; add base of frozen mem. to get phys. addr.
+
+	LDY	#$00			; store the word
+	MOV	ARG3+1,<<(ACC),Y>>
+	INY
+	MOV	ARG3,<<(ACC),Y>>
+
+	RTS				; and return
+
+
+; store byte ARG3 at log. addr. ARG2 (offset) + ARG1 (base)
+; should have test to insure no overrun of end of frozen storage!
+
+OPPTBY:	LDA	ARG2			; calculate logical address
+	CLC
+	ADC	ARG1
+	STA	ACC
+	LDA	ARG2+1
+	ADC	ARG1+1
+	STA	ACC+1
+
+	DADD	ACC,FRZMEM,ACC		; add base of frozen mem. to get phys addr.
+
+	LDY	#$00			; store the byte
+	MOV	ARG3,<<(ACC),Y>>
+
+	RTS				; and return
+
+	PAGE
+; store ARG3 as property of ARG2 of thing ARG1
+
+OPPTP:	JSR	SETUPP			; setup for thing property operations
+
+L12AC:	JSR	GTPNUM			; get the property number
+	CMPBE	ARG2,L12BE		; if it is the one, go do it!
+
+	JSRCC	FATAL			; oops! past it!
+
+	JSR	ADVPPT			; advance pointer
+	JMP	L12AC			; and try again
+
+; got the property we wand
+
+L12BE:	JSR	GTPLEN			; get property length
+	INY
+	CMPBE	#$00,L12D7		; if it is byte sized, go store it
+	CMPJSN	#$01,FATAL		; if it isn't word sized, fatal error
+
+	MOV	ARG3+1,<<(ACC),Y>>	; yes, store high byte
+	INY
+
+	MOV	ARG3,<<(ACC),Y>>	; these two lines are unnecessary
+	RTS
+
+L12D7:	MOV	ARG3,<<(ACC),Y>>	; store low byte
+	RTS				; and return
+
+	PAGE
+OPGTLN:	JSR	OPPRST
+	DADD	ARG1,FRZMEM,ARG1
+	DADD	ARG2,FRZMEM,ARG2
+	JSR	GETLIN
+	STA	ACD+1
+	MOV	<#$00>,ACD
+	LDY	#$01
+	MOV	<#$00>,<<(ARG2),Y>>
+	MOV	<#$02>,LE0
+	MOV	<#$01>,LE1
+L1310:	LDY	#$00
+	LDA	(ARG2),Y
+	INY
+	CMPRE	<(ARG2),Y>
+	DTSTRE	ACD
+	LDA	ACD
+	CMPJSE	<#$06>,L13BA
+	LDA	ACD
+	BNE	L135C
+	LDY	#$06
+	LDX	#$00
+L1332:	MOV	<#$00>,<<$D3,X>>
+	INX
+	DYBNE	L1332
+	LDA	LE1
+	LDY	LE0
+	INY
+	INY
+	INY
+	STA	(ARG2),Y
+	LDY	LE1
+	LDA	(ARG1),Y
+	JSR	L13F1
+	BCS	L137A
+	LDY	LE1
+	LDA	(ARG1),Y
+	JSR	L13E0
+	BCC	L135C
+	INC	LE1
+	DEC	ACD+1
+	JMP	L1310
+L135C:	LDA	ACD+1
+	BEQ	L1382
+	LDY	LE1
+	LDA	(ARG1),Y
+	JSR	L13DA
+	BCS	L1382
+	LDY	LE1
+	LDA	(ARG1),Y
+	LDX	ACD
+	STA	INWORD,X
+	DEC	ACD+1
+	INC	ACD
+	INC	LE1
+	JMP	L1310
+L137A:	STA	INWORD
+	INC	ACD
+	DEC	ACD+1
+	INC	LE1
+L1382:	LDA	ACD
+	BEQ	L1310
+	PSH	ACD+1
+	LDY	LE0
+	INY
+	INY
+	MOV	ACD,<<(ARG2),Y>>
+	JSR	CRNWRD
+	JSR	L141F
+	LDY	LE0
+	MOV	ACB+1,<<(ARG2),Y>>
+	INY
+	MOV	ACB,<<(ARG2),Y>>
+	INY
+	INY
+	INY
+	STY	LE0
+	LDY	#$01
+	ADD	<(ARG2),Y>,<#$01>,<<(ARG2),Y>>
+	PUL	ACD+1
+	MOV	<#$00>,ACD
+	JMP	L1310
+
+L13BA:	LDA	ACD+1
+	RTSEQ
+	LDY	LE1
+	LDA	(ARG1),Y
+	JSR	L13DA
+	RTSCS
+	INC	LE1
+	DEC	ACD+1
+	INC	ACD
+	JMP	L13BA
+
+SEPTAB:	DB	' .,?',CRCHAR,LFCHAR,TBCHAR,FFCHAR
+
+L13DA:	JSR	L13F1
+	RTSCS
+L13E0:	LDY	#$00
+	LDX	#$08
+L13E4:	CMPBE	<SEPTAB,Y>,L13EF
+	INY
+	DXBNE	L13E4
+L13ED:	CLC
+	RTS
+L13EF:	SEC
+L13F0:	RTS
+
+L13F1:	PHA
+	JSR	GTVCBA
+	LDY	#$00
+	LDA	(ACC),Y
+	TAX
+	PLA
+L13FB:	BEQ	L13ED
+	INY
+	CMPBE	<(ACC),Y>,L13EF
+	DEX
+	JMP	L13FB
+
+GTVCBA:	LDY	#HDRVCB
+	MOV	<(FRZMEM),Y>,ACC+1
+	INY
+	MOV	<(FRZMEM),Y>,ACC
+	DADD	ACC,FRZMEM,ACC
+	RTS
+
+L141F:	JSR	GTVCBA
+	LDY	#$00
+	LDA	(ACC),Y
+	TAY
+	INY
+	LDA	(ACC),Y
+	ASL	A
+	ASL	A
+	ASL	A
+	ASL	A
+	STA	ACD
+	INY
+	MOV	<(ACC),Y>,ACB+1
+	INY
+	MOV	<(ACC),Y>,ACB
+	INY
+	TYA
+	ADD	,ACC,ACC
+	BCC	L1445
+	INC	ACC+1
+L1445:	LDY	#$00
+	JMP	L1450
+
+L144A:	LDA	(ACC),Y
+	CMPBG	PKWORD+1,L1470
+L1450:	DADDB1	ACC,ACD,ACC
+	DSUBB1	ACB,<#$10>,ACB
+	LDA	ACB+1
+	BMI	L1470
+	BNE	L144A
+	LDA	ACB
+	BNE	L144A
+L1470:	DSUBB1	ACC,ACD,ACC
+	DADDB1	ACB,<#$10>,ACB
+	LDA	ACD
+	LSR	A
+	LSR	A
+	LSR	A
+	LSR	A
+	STA	ACD
+L148E:	LDY	#$00
+	LDA	PKWORD+1
+	CMPBL	<(ACC),Y>,L14D0
+	BNE	L14B4
+	INY
+	LDA	PKWORD
+	CMPBL	<(ACC),Y>,L14D0
+	BNE	L14B4
+	LDY	#$02
+	LDA	PKWORD+3
+	CMPBL	<(ACC),Y>,L14D0
+	BNE	L14B4
+	INY
+	LDA	PKWORD+2
+	CMPBL	<(ACC),Y>,L14D0
+	BEQ	L14D7
+L14B4:	DADDB1	ACC,ACD,ACC
+	DDEC	ACB
+	DTS2BN	ACB,L148E
+L14D0:	MOV	<#$00>,<ACB+1,ACB>
+	RTS
+L14D7:	DSUB	ACC,FRZMEM,ACB
+	RTS
+
+	PAGE
+
+; print ASCII character ARG1
+
+OPPRCH:	LDA	ARG1
+	JMP	BFCHAR
+
+
+; print decimal number ARG1
+
+OPPRNM:	DMOV	ARG1,ACC
+	JMP	PRNTNM			; unnecessary
+
+
+; print decimal number in ACC
+
+PRNTNM:	LDA	ACC+1			; negative?
+	JSRMI	L152E			;   yes, print '-' and negate
+	MOV	<#$00>,ACD		; initialize digit count to 0
+L150D:	DTSTBE	ACC,L1519		; if the remainder is zero, print it now
+	DMOVI	$000A,ACB		; set up divisor of 10
+	JSR	DIVIDE			; divide
+	PSH	ACB			; push remainder onto stack
+	INC	ACD			; incrmeent digit count
+	JMP	L150D			; do it again
+
+L1519:	LDA	ACD			; is digit count zero?
+	BEQ	L1529			;   yes, just print a '0' and return
+L151D:	PLA				; pull a digit off stack
+	ADD	,<#'0'>			; convert to ASCII
+	JSR	BFCHAR			; print it
+	DECBN	ACD,L151D		; decrement digit count, loop if more
+	RTS				; return to caller
+
+L1529:	LDA	#'0'			; get code for '0'
+	JMP	BFCHAR			; print it and return to caller
+
+L152E:	LDA	#'-'			; get code for '-'
+	JSR	BFCHAR			; print it
+	JMP	L1611			; negate the number, return
+
+	PAGE
+; get a random number from 1 to ARG1
+
+	IFF	RNGDBG
+
+OPRNDM:	DMOV	ARG1,ACB		; save range
+	JSR	L21A0			; get the "random" number
+	JSR	DIVIDE			; divide by range
+	DMOV	ACB,ACC			; get the remainder
+	DINC	ACC			; increment it (base of result is 1)
+	JMP	PTVRP1			; and store it
+
+	ENDIF
+
+; push ARG1 on stack
+
+OPPUSH:	DMOV	ARG1,ACC
+	JMP	PUSHWD
+
+
+; pull stack into variable ARG1
+
+OPPULL:	JSR	PULLWD
+	LDA	ARG1
+	JMP	L0FA1
+
+
+L1568:	DPSH	ACD
+	DMOVI	$0000,ACD
+	LDX	#$10
+L1578:	LDA	ACB
+	CLC
+	AND	#$01
+	BEQ	L158B
+	DADC	ACC,ACD,ACD
+L158B:	DROR	ACD
+	DROR	ACB
+	DXBNE	L1578
+	DMOV	ACB,ACC
+	DMOV	ACD,ACB
+	DPUL	ACD
+	RTS
+
+	PAGE
+; divide ACC by ACB, quotient to ACC, remainder to ACB
+
+DIVIDE:	DPSH	ACD
+	DMOV	ACC,ACD
+	DMOVI	$0000,ACC
+	LDX	#$11
+L15C5:	SEC
+	LDA	ACC
+	SBC	ACB
+	TAY
+	LDA	ACC+1
+	SBC	ACB+1
+	BCC	L15D6
+	STA	ACC+1
+	TYA
+	STA	ACC
+L15D6:	DROL	ACD
+	DROL	ACC
+	DXBNE	L15C5
+	CLC
+	DROR	ACC,ACB
+	DMOV	ACD,ACC
+	DPUL	ACD
+	RTS
+
+L15FB:	MOV	<#$00>,MDFLAG
+	LDA	ACC+1
+	JSR	L161F
+	LDA	ACB+1
+	JSR	L161F
+	RTS
+
+L160A:	LDA	MDFLAG
+	AND	#$01
+	RTSEQ
+L1611:	SEC
+	LDA	#$00
+	SBC	ACC
+	STA	ACC
+	LDA	#$00
+	SBC	ACC+1
+	STA	ACC+1
+	RTS
+
+L161F:	TSTARP				; if positive, return
+	INC	MDFLAG
+	JMP	L1611
+
+	PAGE
+; setup stuff for thing attribute bit operations
+
+SETUPA:	LDA	ARG1
+	JSR	SETUPT
+	LDA	ARG2
+	CMPBL	<#$10>,L1643
+	SUB	,<#$10>
+	DINC	ACC
+	DINC	ACC
+L1643:	STA	ACB
+	DMOVI	$0001,ACD
+	SUB	<#$0F>,ACB
+	TAX
+L1653:	BEQ	L165D
+	DASL	ACD
+	DEX
+	JMP	L1653
+L165D:	LDY	#$00
+	MOV	<(ACC),Y>,ACB+1
+	INY
+	MOV	<(ACC),Y>,ACB
+	RTS
+
+
+; setup stuff for thing property operations
+
+SETUPP:	LDA	ARG1
+	JSR	SETUPT
+	LDY	#THGPRP
+	MOV	<(ACC),Y>,ACB+1
+	INY
+	MOV	<(ACC),Y>,ACB
+	DADD	ACB,FRZMEM,ACC
+	LDY	#$00
+	LDA	(ACC),Y
+	ASL	A
+	TAY
+	INY
+	RTS
+
+
+; get number of property pointed to by ACC
+
+GTPNUM:	LDA	(ACC),Y
+	AND	#$1F
+	RTS
+
+
+; get lenght of property pointed to by ACC
+
+GTPLEN:	LDA	(ACC),Y
+	REPT	5
+	ROR	A
+	ENDM
+	AND	#$07
+	RTS
+
+
+; advance ACC to point to next property
+
+ADVPPT:	JSR	GTPLEN
+	TAX
+L16A1:	INY
+	DXBPL	L16A1
+	INY
+	RTS
+
+
+; setup stuff for thing operations
+
+SETUPT:	STA	ACC
+	MOV	<#$00>,ACC+1
+	LDA	ACC
+	REPT	3
+	DASL	ACC
+	ENDM
+	ADD	,ACC
+	BCC	L16C3
+	INC	ACC+1
+	CLC
+L16C3:	ADC	#$35
+	STA	ACC
+	BCC	L16CB
+	INC	ACC+1
+L16CB:	LDY	#HDRTHG+1
+	ADD	<(FRZMEM),Y>,ACC,ACC
+	DEY
+	LDA	(FRZMEM),Y
+	ADC	ACC+1
+	ADC	FRZMEM+1
+	STA	ACC+1
+	RTS
+
+	PAGE
+L16DE:	LDA	ACB+1
+	EOR	ACC+1
+	BPL	L16E9
+	LDA	ACB+1
+	CMP	ACC+1
+	RTS
+L16E9:	LDA	ACC+1
+	CMPBN	ACB+1,L16F3
+	LDA	ACC
+	CMP	ACB
+L16F3:	RTS
+
+PUSHWD:	DDEC	STKPNT
+	LDY	#$00
+	MOV	ACC,<<(STKPNT),Y>>
+	DDEC	STKPNT
+	MOV	ACC+1,<<(STKPNT),Y>>
+	INC	STKCNT
+	LDA	STKCNT
+	CMPJSG	<#STCKMX>,FATAL
+	RTS
+
+PULLWD:	LDY	#$00
+	MOV	<(STKPNT),Y>,ACC+1
+	DINC	STKPNT
+	MOV	<(STKPNT),Y>,ACC
+	DINC	STKPNT
+	DEC	STKCNT
+	JSREQ	FATAL
+	RTS
+
+	PAGE
+; fetch next byte from PC into A
+
+FTPRBA:	LDA	PRGUPD			; need to find a new page?
+	BEQ	L1757			;   yes, go do it!
+
+	LDY	PRGIDX			; get the byte
+	LDA	(PRGMPT),Y
+
+	INY				; increment the low byte of the PC
+	STY	PRGIDX
+	RTSNE				; return unless we've entered a new page
+
+	LDY	#$00			; unnecessary!
+	STY	PRGUPD			; indicate new page
+	DINC	PRGLPG			; increment page number
+	RTS				; return
+
+L1757:	LDA	PRGLPG+1		; is the page we're looking for frozen?
+	BNE	L1761
+	LDA	PRGLPG
+	CMPBL	FRZPGS,L1778
+
+L1761:	DMOV	PRGLPG,ACC		; no, see if it is swapped in
+	JSR	FNDPAG
+	STA	PRGPPG			; save phys. page no.
+	BCS	L1788			; not found
+
+; we have the swappable page, fix up the pointers, etc.
+
+L1770:	JSR	MRKPAG			; indicate that we're using this page
+
+	CLC				; add phys. page number to number
+	LDA	PRGPPG			; of frozen pages
+	ADC	FRZPGS
+
+; fix the memory pointers
+
+L1778:	ADD	,FRZMEM+1,PRGMPT+1	; add base of frozen memory
+	MOV	<#$00>,PRGMPT
+
+	MOV	<#$FF>,PRGUPD		; indicate that we have the page
+	JMP	FTPRBA			; and go get the byte
+
+; we need to load the page from disk
+
+L1788:	CMPBN	AUXPPG,L1790		; if we are about to load a new logical
+	MOV	<#$00>,AUXUPD		; page into the physical page AUX points
+					; to, mark it as new page
+
+L1790:	DMOV	SWPMEM,ACC		; setup to read the page
+	ADD	PRGPPG,ACC+1,ACC+1
+	DMOV	PRGLPG,ACB
+
+	JSR	DRDBKF			; read the page (die if error)
+
+	LDY	PRGPPG			; copy the new log. page number into
+	MOV	PRGLPG,<<(VMTAB1),Y>>	; the VM table
+	MOV	PRGLPG+1,<<(VMTAB2),Y>>
+
+	TYA
+	JMP	L1770			; go fix up the pointers and fetch the byte
+
+	PAGE
+; set AUX to byte address in ACC
+
+SETAXB:	MOV	ACC,AUXIDX
+	MOV	ACC+1,AUXLPG
+	MOV	<#$00>,AUXLPG+1
+L17C4:	MOV	<#$00>,AUXUPD
+	RTS
+
+
+; set AUX to word address in ACC
+
+SETAXW:	LDA	ACC
+	ASL	A
+	STA	AUXIDX
+	LDA	ACC+1
+	ROL	A
+	STA	AUXLPG
+	LDA	#$00
+	ROL	A
+	STA	AUXLPG+1
+	JMP	L17C4
+
+
+; fetch next word from AUX into ACC
+
+FTAXWD:	JSR	FTAXBA
+	PHA
+	JSR	FTAXBA
+	STA	ACC
+	PUL	ACC+1
+	RTS
+
+	PAGE
+; fetch next byte from AUX into A
+
+FTAXBA:	LDA	AUXUPD			; need to find a new page?
+	BEQ	L1801			;   yes, go to it!
+
+	LDY	AUXIDX			; get the byte
+	LDA	(AUXMPT),Y
+
+	INY				; increment the low byte of AUX
+	STY	AUXIDX
+	RTSNE				; return uness we've entered a new page
+
+	LDY	#$00			; unnecessary!
+	STY	AUXUPD			; indicate new page
+	DINC	AUXLPG			; increment page number
+	RTS				; return
+
+L1801:	LDA	AUXLPG+1		; is the page we're looking for frozen?
+	BNE	L180B
+	LDA	AUXLPG
+L1807:	CMPBL	FRZPGS,L1822
+
+L180B:	DMOV	AUXLPG,ACC		; no, see if it is swapped in
+	JSR	FNDPAG
+	STA	AUXPPG			; save phys. page no.
+	BCS	L1832			; not fount
+
+; we have the swappable page, fix up the pointers, etc.
+
+L181A:	JSR	MRKPAG			; indicate that we're using this page
+
+	CLC				; add phys. page number to number of
+	LDA	AUXPPG			; frozen pages
+	ADC	FRZPGS
+
+; fix the memory pointers
+
+L1822:	ADD	,FRZMEM+1,AUXMPT+1	; add base of memory
+	MOV	<#$00>,AUXMPT
+
+	MOV	<#$FF>,AUXUPD		; indicate that we have the page
+	JMP	FTAXBA			; and go get the byte
+
+; we need to load the page from disk
+
+L1832:	CMPBN	PRGPPG,L183A		; if we are about to load a new logical
+	MOV	<#$00>,PRGUPD		; page into the physical page the PC
+					; points to, mark it as a new page
+
+L183A:	DMOV	SWPMEM,ACC		; setup to read the page
+	ADD	AUXPPG,ACC+1,ACC+1
+	DMOV	AUXLPG,ACB
+
+	JSR	DRDBKF			; read the page (die if error)
+
+	LDY	AUXPPG			; copy the new log. page number into
+	MOV	AUXLPG,<<(VMTAB1),Y>>	; the VM table
+	MOV	AUXLPG+1,<<(VMTAB2),Y>>
+
+	TYA
+	JMP	L181A			; go fix up the pointers and fetch the byte
+
+	PAGE
+; we've just started using a new logical page, move it to the front of our list
+; this makes least recently used pages first candidates to be removed
+
+MRKPAG:	CMPBE	MRUPAG,L1891
+	LDX	MRUPAG
+	STA	MRUPAG
+	TAY
+	MOV	<(VMTAB3),Y>,ACC
+	TXA
+	STA	(VMTAB3),Y
+	MOV	<(VMTAB4),Y>,ACC+1
+	MOV	<#$FF>,<<(VMTAB4),Y>>
+	LDY	ACC+1
+	MOV	ACC,<<(VMTAB3),Y>>
+	TXA
+	TAY
+	MOV	MRUPAG,<<(VMTAB4),Y>>
+	LDA	ACC
+	CMPBE	<#$FF>,L1892
+	TAY
+	MOV	ACC+1,<<(VMTAB4),Y>>
+L1891:	RTS
+L1892:	MOV	ACC+1,LRUPAG
+	RTS
+
+
+; search virtual memory table for logical page # in ACC
+
+FNDPAG:	LDX	SWPPGS
+	LDY	#$00
+	LDA	ACC
+L189D:	CMPBN	<(VMTAB1),Y>,L18A9
+	LDA	ACC+1
+	CMPBE	<(VMTAB2),Y>,L18B1
+	LDA	ACC
+L18A9:	INY
+	DXBNE	L189D
+	LDA	LRUPAG
+	SEC
+	RTS
+L18B1:	TYA
+	CLC
+	RTS
+
+	PAGE
+; print string at AUX
+
+PRNTST:	MOV	<#$00>,<PRMMOD,PNYBCN>
+	MOV	<#$FF>,TMPMOD
+DONEXT:	JSR	GETNYB
+	RTSCS
+	STA	ACD
+	BEQ	DOSPAC
+	CMPBL	<#$04>,DOSBWD
+	CMPBL	<#$06>,NEWMOD
+	JSR	TSTMOD
+	TSTABN	L18E2
+	LDA	#$5B
+L18D9:	ADD	,ACD
+L18DC:	JSR	BFCHAR
+	JMP	DONEXT
+L18E2:	CMPBN	<#$01>,DOSPCL
+	LDA	#$3B
+	JMP	L18D9
+
+DOSPCL:	SUB	ACD,<#$07>
+	BCC	DOASCI
+	BEQ	DOCRLF
+	TAY
+	DEY
+	LDA	SPCLCH,Y
+	JMP	L18Dc
+
+DOASCI:	JSR	GETNYB
+	REPT	5
+	ASL	A
+	ENDM
+	PHA
+	JSR	GETNYB
+	STA	ACD
+	PLA
+	ORA	ACD
+	JMP	L18DC
+
+	PAGE
+DOSPAC:	LDA	#' '
+	JMP	L18DC
+
+DOCRLF:	LDA	#CRCHAR
+	JSR	BFCHAR
+	LDA	#LFCHAR
+	JMP	L18DC
+
+NEWMOD:	SUB	,<#$03>
+	TAY
+	JSR	TSTMOD
+	BNE	L192D
+	STY	TMPMOD
+	JMP	DONEXT
+L192D:	STY	PRMMOD
+	CMPBE	PRMMOD,L1937
+	LDY	#$00
+	STY	PRMMOD
+L1937:	JMP	DONEXT
+
+	PAGE
+L193A:	DB	$00
+
+DOSBWD:	DECA
+	REPT	6
+	ASL	A
+	ENDM
+	STA	L193A
+	JSR	GETNYB
+	ASL	A
+	ADC	#$01
+	ADC	L193A
+	TAY
+	MOV	<(SBWDPT),Y>,ACC
+	DEY
+	MOV	<(SBWDPT),Y>,ACC+1
+	PSH	<PRMMOD,PNYBCN>
+	DPSH	PNYBBF
+	PSH	AUXIDX
+	DPSH	AUXLPG
+	JSR	SETAXW
+	JSR	PRNTST
+	DPUL	AUXLPG
+	PUL	AUXIDX
+	MOV	<#$00>,AUXUPD
+	DPUL	PNYBBF
+	PUL	<PNYBCN,PRMMOD>
+	MOV	<#$FF>,TMPMOD
+	JMP	DONEXT
+
+SPCLCH:	DB	'0123456789.,!?_#''"/\-:()'
+
+TSTMOD:	LDA	TMPMOD
+	BPL	L19B4
+	LDA	PRMMOD
+	RTS
+L19B4:	LDY	#$FF
+	STY	TMPMOD
+	RTS
+
+	PAGE
+GETNYB:	LDA	PNYBCN
+	BPL	L19BF
+	SEC
+	RTS
+L19BF:	BNE	L19D6
+	INC	PNYBCN
+	JSR	FTAXWD
+	DMOV	ACC,PNYBBF
+	LDA	PNYBBF+1
+	LSR	A
+	LSR	A
+	AND	#$1F
+	CLC
+	RTS
+L19D6:	DECABN	L19F3
+	MOV	<#$02>,PNYBCN
+	LDA	PNYBBF+1
+	LSR	A
+	LDA	PNYBBF
+	ROR	A
+	TAY	
+	LDA	PNYBBF+1
+	LSR	A
+	LSR	A
+	TYA
+	ROR	A
+	LSR	A
+	LSR	A
+	LSR	A
+	AND	#$1F
+	CLC
+	RTS
+L19F3:	MOV	<#$00>,PNYBCN
+	LDA	PNYBBF+1
+	BPL	L19FF
+	MOV	<#$FF>,PNYBCN
+L19FF:	LDA	PNYBBF
+	AND	#$1F
+	CLC
+	RTS
+
+	PAGE
+; crunch word to compare with vocab table entries
+
+CRNWRD:	LDX	#$00
+	LDY	#$06
+L1A09:	MOV	<#$05>,<<PKWORD,X>>
+	INX
+	DYBNE	L1A09
+	MOV	<#$06>,ACD+1
+	MOV	<#$00>,<ACB,ACC>
+L1A1B:	LDX	ACC
+	INC	ACC
+	MOV	<INWORD,X>,ACD
+	BNE	L1A2A
+	LDA	#$05
+	JMP	L1A52
+L1A2A:	LDA	ACD
+	JSR	TSTCHR
+	TSTABE	L1A43
+	ADD	,<#$03>
+	LDX	ACB
+	STA	PKWORD,X
+	INC	ACB
+	DECJE	ACD+1,L1ACA
+L1A43:	LDA	ACD
+	JSR	TSTCHR
+	DECABP	L1A62
+	SUB	ACD,<#$5B>
+L1A52:	LDX	ACB
+	STA	PKWORD,X
+	INC	ACB
+	DECJN	ACD+1,L1A1B
+	JMP	L1ACA
+L1A62:	BNE	L1A6C
+	SUB	ACD,<#$3B>
+	JMP	L1A52
+L1A6C:	LDA	ACD
+	JSR	L1A99
+	BNE	L1A52
+	LDA	#$06
+	LDX	ACB
+	STA	PKWORD,X
+	INC	ACB
+	DECBE	ACD+1,L1ACA
+	LDA	ACD
+	REPT	5
+	LSR	A
+	ENDM
+	AND	#$03
+	LDX	ACB
+	STA	PKWORD,X
+	INC	ACB
+	DECBE	ACD+1,L1ACA
+	LDA	ACD
+	AND	#$1F
+	JMP	L1A52
+
+L1A99:	LDX	#$24
+L1A9B:	CMPBE	<SPCLCH,X>,L1AA6
+	DXBPL	L1A9B
+	LDY	#$00
+	RTS
+L1AA6:	TXA
+	ADD	,<#$08>
+	RTS
+
+TSTCHR:	CMPBL	<#'a'>,L1AB6
+	CMPBG	<#'z'+1>,L1AB6
+	LDA	#$00
+	RTS
+L1AB6:	CMPBL	<#'A'>,L1AC1
+	CMPBG	<#'Z'+1>,L1AC1
+	LDA	#$01
+	RTS
+L1AC1:	TSTABE	L1AC9
+	BMI	L1AC9
+	LDA	#$02
+L1AC9:	RTS
+
+L1ACA:	LDA	PKWORD+1
+	REPT	4
+	ASL	A
+	ENDM
+	ROL	PKWORD
+	ASL	A
+	ROL	PKWORD
+	LDX	PKWORD
+	STX	PKWORD+1
+	ORA	PKWORD+2
+	STA	PKWORD
+	LDA	LDE
+	REPT	4
+	ASL	A
+	ENDM
+	ROL	PKWORD+3
+	ASL	A
+	ROL	PKWORD+3
+	LDX	PKWORD+3
+	STX	PKWORD+3
+	ORA	LDF
+	STA	PKWORD+2
+	LDA	PKWORD+3
+	ORA	#$80
+	STA	PKWORD+3
+	RTS
+
+	PAGE
+; init output routine and screen window
+
+INITSC:	MOV	<#$C1>,PRCSWL+1
+
+	IFF	RNGDBG			; if RNG debug, save 2 lines at top!
+	MOV	<#$01>,WNDTOP
+	ENDIF
+
+	MOV	<#$00>,<WNDLFT,L1BA0>
+	MOV	<#$28>,WNDWDT
+	MOV	<#$18>,WNDBOT
+	MOV	<#$BE>,PROMPT
+	MOV	<#$FF>,INVFLG
+
+; clear the screen
+
+CLRSCR:	JSR	HOME
+	MOV	WNDTOP,LINCNT
+	RTS
+
+
+; find the highest usable page of memory
+
+FNDMEM:	DMOVI2	LSTFLC+$0100,ACC
+	LDY	#$00
+L1B28:	DEC	ACC+1
+	LDA	(ACC),Y
+	CMPBN	<(ACC),Y>,L1B28
+	EOR	#$FF
+	STA	(ACC),Y
+	CMPBN	<(ACC),Y>,L1B28
+	EOR	#$FF
+	STA	(ACC),Y
+	LDA	ACC+1
+	RTS
+
+	PAGE
+; buffer a character for output
+
+BFCHAR:	LDX	CHRPTR			; get buffer pointer
+
+	CMPJE	<#CRCHAR>,PRNTBF	; if char is a CR, flush buffer
+	CMPBL	<#' '>,L1B61		; if it is a control character, discard it
+	CMPBL	<#$60>,L1B57		; if it is in 64 char subset, buffer it as is
+
+	IFT	LC40
+	BIT	INVFLG			; if inverse, convert LC to UC
+	BMI	L1B57
+	ELSE
+	CMP	#$80			; is it in LC range ($60 <= char < $80)?
+	BGE	L1B57
+	ENDIF
+
+	SUB	,<#$20>			;   yes, convert o upper case
+
+L1B57:	ORA	#$80			; set high bit for Apple
+
+	STA	BUFFER,X		; store it in buffer
+	CPXBG	WNDWDT,L1B64		; if buffer is full, print some of it
+
+	INX				; increment pointer
+L1B61:	STX	CHRPTR			; save pointer
+	RTS				; return
+
+; find last spac ein buffer, if any
+
+L1B64:	LDA	#" "			; load a space for comparison
+
+L1B66:	CMPBE	<BUFFER,X>,L1B70	; if this is one, we've got it
+	DXBNE	L1B66			; no, loop if no character in buffer
+
+	LDX	WNDWDT			; no space... use last character
+
+L1B70:	STX	CHRPT2			; save pointer
+	STX	CHRPTR
+
+	JSR	PRNTBF			; print line up to this point
+
+; move rest of line back to beginning of buffer
+
+L1B77:	INC	CHRPT2			; get pointer to next char
+	LDX	CHRPT2
+	CPXRGT	WNDWDT			; if it is past the last char, return
+
+	LDA	BUFFER,X		; get the character
+	LDX	CHRPTR			; get the pointer to the new loc
+	STA	BUFFER,X		; store the character there
+	INC	CHRPTR			; and increment the pointer
+
+	LDX	CHRPT2			; unnecessary!
+	JMP	L1B77			; try for another one
+
+	PAGE
+; output the buffer to the screen, and to the printer if enabled
+
+OUTBUF:	LDY	#HDRFLG+1
+	LDA	(FRZMEM),Y
+	AND	#$01
+	JSRNE	PRTBUF
+	JSR	DSPBUF
+	RTS
+
+
+; output the buffer to the printer
+
+L1BA0:	DB	$00			; printer initialization flag
+
+PRTBUF:	DPSH	CSWL			; save our output vector
+	PSH	CURSRH			; and cursor column
+
+	DMOV	PRCSWL,CSWL		; get vector for printer
+
+	LDX	#$00			; start with position 0 in buffer
+
+	LDA	L1BA0			; is printer initialized?
+	BNE	L1BD5			; yes, go print it
+	INC	L1BA0			; no, but now will be
+
+	LDA	#$89			; output ^I80N
+	JSR	COUT			;   (this sets printer width to 80
+	LDA	#$91			;    characters, thereby disabling
+	STA	PRTWDT			;    screen echo (we hope!))
+	LDA	#$B8
+	JSR	COUT
+	LDA	#$B0
+	JSR	COUT
+	LDA	#$CE
+	JSR	COUT
+
+L1BD5:	CPXBE	CHRPTR,L1BE3		; are we done yet?
+
+	LDA	BUFFER,X		; no, get character
+	JSR	COUT			; and output it
+
+	INX				; increment pointer
+	JMP	L1BD5			; and go for another one
+
+L1BE3:	DMOV	CSWL,PRCSWL		; save print vector again (may have changed)
+
+	PUL	CURSRH			; restore cursor column
+	DPUL	CSWL			; and display vector
+	RTS				; and return
+
+
+; output the buffer to the display
+
+DSPBUF:	LDX	#$00			; start with position 0 in buffer
+
+L1BF7:	CPXBE	CHRPTR,L1C05		; are we done yet?
+
+	LDA	BUFFER,X		; get the character
+	JSR	COUT1			; and output it
+
+	INX				; increment pointer
+	JMP	L1BF7			; and go for another one
+
+L1C05:	LDX	#$00			; reset pointer to beginning
+	STX	CHRPTR
+	RTS				; and return
+
+	PAGE
+MOREMS:	DB	'[MORE]'
+MRMSLN	EQU	*-MOREMS
+
+PRNTBF:	INC	LINCNT
+	LDA	LINCNT
+	CMPBL	WNDBOT,L1C40
+	DMOVI	MOREMS,ACC
+	LDX	#MRMSLN
+	MOV	<#$3F>,INVFLG
+	JSR	SHWMSG
+	MOV	<#$FF>,INVFLG
+	JSR	RDKEY
+	SUB	CURSRH,<#$06>,CURSRH
+	JSR	CLREOL
+	MOV	WNDTOP,LINCNT
+	INC	LINCNT
+L1C40:	PSH	CHRPTR
+	JSR	OUTBUF
+	PLA
+	CMPBE	WNDWDT,L1C50
+	LDA	#$8D
+	JSR	COUT1
+L1C50:	LDY	#HDRFLG+1
+	LDA	(FRZMEM),Y
+	AND	#$01
+	BEQ	L1C79
+	DPSH	CSWL
+	DMOV	PRCSWL,CSWL
+	LDA	#$8D
+	JSR	COUT
+	DMOV	CSWL,PRCSWL
+	DPUL	CSWL
+L1C79:	LDX	#$00
+	JMP	L1B61
+
+	PAGE
+SCORMS:	DB	'SCORE:'
+SCMSLN	EQU	*-SCORMS
+
+TIMEMS:	DB	'TIME:'
+TMMSLN	EQU	*-TIMEMS
+
+L1C89:	DB	$00
+
+OPPRST:	JSR	OUTBUF			; print what's in the buffer
+	PSH	<CURSRH,CURSRV>		; save the cursor position
+	MOV	<#$00>,<CURSRH,CURSRV>	; home the cursor
+	JSR	VTAB
+	MOV	<#$3F>,INVFLG		; set inverse mode
+
+	LDA	#$10			; get global var 0
+	JSR	GTVRA1
+	LDA	ACC			; is it save as last time?
+	CMPBE	L1C89,L1CB8		; yes, don't print it
+	STA	L1C89			; no, save for next time's compare
+	JSR	L0DE4			; output thing name
+	JSR	DSPBUF			; send it to display
+	JSR	CLREOL			; clear rest of line
+
+L1CB8:	MOV	<#$19>,CURSRH		; tab over
+	LDA	STLTYP			; score or time?
+	BNE	L1CDB			; time
+	DMOVI	SCORMS,ACC		; score, print "SCORE:"
+	LDX	#SCMSLN
+	JSR	SHWMSG
+	INC	CURSRH			; one space
+	LDA	#$11			; get global var 1 (score)
+	JSR	GTVRA1
+	JSR	PRNTNM			; output it as decimal number
+	LDA	#'/'			; separator
+	BNE	L1D05			; always taken
+
+L1CDB:	DMOVI	TIMEMS,ACC		; print "TIME:"
+	LDX	#TMMSLN
+	JSR	SHWMSG
+	INC	CURSRH			; one space
+	LDA	#$11			; get global var 1 (time)
+	JSR	GTVRA1
+	LDA	ACC			; is it zero?
+	BNE	L1CF5
+	LDA	#$18			; yes, make it 24:00
+L1CF5:	CMPBM	<#$0C>,L1D00		; is it A.M. or P.M.?
+	BEQ	L1D00
+	SEC				; P.M., convert to 1-12 range
+	SBC	#$0C			;  by subtracting 12
+	STA	ACC
+L1D00:	JSR	PRNTNM			; print out hours
+	LDA	#':'
+L1D05:	JSR	BFCHAR			; print the separator
+	LDA	#$12			; get global var 2 (turns/minutes)
+	JSR	GTVRA1
+	LDA	STLTYP			; time?
+	BEQ	L1D40			; no, go print turns
+	LDA	ACC			; yes, are minutes < 10?
+	CMPBG	<#$0A>,L1D1C		; no
+	LDA	#$B0			; yes, print a space (?)
+	JSR	BFCHAR
+L1D1C:	JSR	PRNTNM			; print the minutes
+	LDA	#$A0			; print a space
+	JSR	BFCHAR
+	LDA	#$11			; get global var 1 (hours)
+	JSR	GTVRA1
+	LDA	ACC			; is it A.M. or P.M.?
+	CMPBP	<#$0C>,L1D33		; P.M.
+	LDA	#"A"			; A.M.
+	BNE	L1D35
+L1D33:	LDA	#"P"
+L1D35:	JSR	BFCHAR			; print the "A" or "P"
+	LDA	#"M"
+	JSR	BFCHAR			; print the "M"
+	JMP	L1D43
+
+L1D40:	JSR	PRNTNM			; print the score
+L1D43:	JSR	DSPBUF			; display the buffer
+	JSR	CLREOL			; clear out the line
+	MOV	<#$FF>,INVFLG		; back to normal video mode
+	PUL	<CURSRV,CURSRH>		; and the old cursor loc
+	JSR	VTAB
+	RTS				; return to caller
+
+SHWMSG:	LDY	#$00
+L1D59:	LDA	(ACC),Y
+	ORA	#$80
+	JSR	COUT1
+	INY
+	DXBNE	L1D59
+	RTS
+
+	PAGE
+GETLIN:	JSR	OUTBUF
+	MOV	WNDTOP,LINCNT
+	JSR	GETLN1
+	INC	LINCNT
+	MOV	<#$8D>,<<BUFFER,X>>
+	INX
+	TXA
+	PHA
+	LDY	#HDRFLG+1
+	LDA	(FRZMEM),Y
+	AND	#$01
+	BEQ	L1D8B
+	TXA
+	STA	CHRPTR
+	JSR	PRTBUF
+	MOV	<#$00>,CHRPTR
+L1D8B:	PLA
+	LDY	#$00
+	CMPBL	<(ARG1),Y>,L1D94
+	LDA	(ARG1),Y
+L1D94:	PHA
+	BEQ	L1DB1
+	TAX
+L1D98:	LDA	BUFFER,Y
+	AND	#$7F
+	CMPBL	<#'A'>,L1DA7
+	CMPBG	<#'Z'+1>,L1DA7
+	ORA	#$20
+L1DA7:	INY
+	STA	(ARG1),Y
+	CMPBE	<#CRCHAR>,L1DB1
+	DXBNE	L1D98
+L1DB1:	PLA
+	RTS
+
+	PAGE
+
+IOB:	DB	$01			; IOB type
+IOBSLT:	DB	$60			; Slot * 16
+IOBDRV:	DB	$01			; Drive
+	DB	$00			; Volume
+IOBTRK:	DB	$00			; Track
+IOBSCT:	DB	$00			; Sector
+	DW	DCT			; Device Characteristics Table
+IOBBUF:	DW	$0000			; I/O buffer
+	DW	$0000			; unused
+IOBCMD:	DB	$00			; Command
+	DB	$00			; Status
+	DB	$00			; Actual volume
+	DB	$60			; Previous slot * 16
+	DB	$01			; Previous drive
+
+DCT:	DB	$00,$01,$EF,$D8
+
+DISKIO:	STA	IOBCMD
+	DMOV	ACC,IOBBUF
+	MOV	#$03,IOBTRK
+	LDA	ACB
+	LDX	ACB+1
+	SEC
+L1DDF:	SBC	SECPTK
+	BCS	L1DE7
+	DXBMI	L1DED
+	SEC
+L1DE7:	INC	IOBTRK
+	JMP	L1DDF
+L1DED:	ADD	,SECPTK,IOBSCT
+	LDA	#>IOB
+	LDY	#<IOB
+	JMP	RWTS
+
+DRDBUF:	DMOVI	BUFFER,ACC
+DRDNXT:	DINC	ACB
+DRDBLK:	LDA	#$01
+	JMP	DISKIO
+
+DRDBKF:	JSR	DRDBLK
+	JSRCS	FATAL
+	RTS
+
+DWRBUF:	DMOVI	BUFFER,ACC
+DWRNXT:	DINC	ACB
+	LDA	#$02
+	JMP	DISKIO
+
+	PAGE
+
+OUTMSG:	STX	ACD
+	LDY	#$00
+	STY	ACD+1
+L1E2F:	LDY	ACD+1
+	LDA	(ACC),Y
+	JSR	BFCHAR
+	INC	ACD+1
+	DECBN	ACD,L1E2F
+	RTS
+
+L1E3D:	DB	'PLEASE INSERT SAVE DISKETTE,'
+
+L1E59:	DB	$00
+
+L1E5A:	DB	'SLOT     (1-7):'
+L1E69:	DB	'618'
+
+L1E6C:	DB	'DRIVE    (1-2):'
+L1E7B:	DB	'213'
+
+L1E7E:	DB	'POSITION (0-7):'
+L1E8D:	DB	'008'
+
+L1E90:	DB	'DEFAULT = '
+
+L1E9A:	DB	'--- PRESS ''RETURN'' KEY TO BEGIN ---'
+
+	PAGE
+L1EBD:	JSR	CLRSCR
+	JSR	PRNTBF
+	JSR	PRNTBF
+	DMOVI	L1E3D,ACC
+	LDX	#$1C
+	JSR	OUTMSG
+	JSR	PRNTBF
+	MOV	<#$24>,L1E59
+	JSR	L1F4C
+	STA	L1E8D
+	JSR	BFCHAR
+	MOV	<#$00>,L1E59
+	JSR	L1F4C
+	TAX
+	AND	#$07
+	REPT	4
+	ASL	A
+	ENDM
+	STA	IOBSLT
+	TXA
+	STA	L1E69
+	JSR	BFCHAR
+	MOV	<#$12>,L1E59
+	JSR	L1F4C
+	TAX
+	AND	#$03
+	STA	IOBDRV
+	TXA
+	STA	L1E7B
+	JSR	BFCHAR
+L1F12:	JSR	PRNTBF
+	DMOVI	L1E9A,ACC
+	LDX	#$23
+	JSR	OUTMSG
+	JSR	OUTBUF
+	JSR	RDKEY
+	CMPBN	<#$8D>,L1F12
+	MOV	<#$FF>,<ACB,ACB+1>
+	LDA	L1E8D
+	AND	#$07
+	BEQ	L1F48
+	TAY
+L1F3A:	DADDB2	ACB,<#$40>
+	DYBNE	L1F3A
+L1F48:	JSR	PRNTBF
+	RTS
+
+	PAGE
+L1F4C:	JSR	PRNTBF
+	DMOVI	L1E5A,ACC
+	DADDB2	ACC,L1E59
+	LDX	#$0F
+	JSR	OUTMSG
+	JSR	OUTBUF
+	MOV	<#$19>,CURSRH
+	MOV	<#$3F>,INVFLG
+	DMOVI	L1E90,ACC
+	LDX	#$0A
+	JSR	SHWMSG
+	DMOVI	L1E69,ACC
+	DADDB2	ACC,L1E59
+	LDX	#$01
+	JSR	SHWMSG
+	MOV	<#$FF>,INVFLG
+	JSR	RDKEY
+	PHA
+	MOV	<#$19>,CURSRH
+	JSR	CLREOL
+	PLA
+	LDY	L1E59
+	CMPBN	<#$8D>,L1FB3
+	LDA	L1E69,Y
+L1FB3:	AND	#$7F
+	CMPBL	<L1E69+1,Y>,L1F4C
+	CMPBG	<L1E69+2,Y>,L1F4C
+	RTS
+
+	PAGE
+L1FC0:	DB	'PLEASE RE-INSERT GAME DISKETTE,'
+
+L1FDF:	DB	'--- PRESS ''RETURN'' KEY TO CONTINUE ---'
+
+L2005:	LDA	IOBSLT
+	CMPBN	<#$60>,L2040
+	LDA	IOBDRV
+	CMPBN	<#$01>,L2040
+	JSR	PRNTBF
+	DMOVI	L1FC0,ACC
+	LDX	#$1F
+	JSR	OUTMSG
+L2023:	JSR	PRNTBF
+	DMOVI	L1FDF,ACC
+	LDX	#$26
+	JSR	OUTMSG
+	JSR	OUTBUF
+	JSR	RDKEY
+	CMPBN	<#$8D>,L2023
+	JSR	PRNTBF
+L2040:	MOV	<#$60>,IOBSLT
+	MOV	<#$01>,IOBDRV
+	RTS
+
+	PAGE
+
+OPSVGM:	JSR	L1EBD			; setup for disk I/O
+
+	LDX	#$00			; copy game release # to buffer
+	LDY	#HDRREL
+	MOV	<(FRZMEM),Y>,<<BUFFER,X>>
+	INX
+	INY
+	MOV	<(FRZMEM),Y>,<<BUFFER,X>>
+	INX
+
+	DMOVI	PRGIDX,ACC		; copy PC to buffer
+	LDY	#$03
+	JSR	SVGMMV
+
+	DMOVI	LOCVAR,ACC		; copy local variables to buffer
+	LDY	#$1E
+	JSR	SVGMMV
+
+	DMOVI	STKCNT,ACC		; copy SP and SP save to buffer
+	LDY	#$06
+	JSR	SVGMMV
+
+	JSR	DWRBUF			; write it out
+	BCS	SVGMFL			; fail if error
+
+	LDX	#$00			; copy lowest 256 bytes of stack
+	DMOVI	STKLIM,ACC		; to buffer
+	LDY	#$00
+	JSR	SVGMMV
+
+	JSR	DWRBUF			; write it out
+	BCS	SVGMFL			; fail if error
+
+	LDX	#$00			; copy high 192 bytes of stack
+	DMOVI	STKLIM+$0100,ACC	; to buffer
+	LDY	#$C0
+	JSR	SVGMMV
+
+	JSR	DWRBUF			; write it out
+	BCS	SVGMFL			; fail if error
+
+	DMOV	FRZMEM,ACC		; figure out how many pages of
+	LDY	#HDRIMP			; impure storage there are tobe
+	MOV	<(FRZMEM),Y>,ACD	; written out, and set up for first
+	INC	ACD			; one
+
+L20C3:	JSR	DWRNXT			; write one page of impure storage
+	BCS	SVGMFL			; fail if error
+	INC	ACC+1			; increment buffer address
+	DECBN	ACD,L20C3		; decrement page count, loop if more
+
+	JSR	DWRNXT			; write final page
+	BCS	SVGMFL			; fail if error
+
+	JSR	L2005			; make sure we have game disk
+	JMP	PREDTR			; return true (no error)
+
+SVGMFL:	JSR	L2005			; make sure we have game disk
+	JMP	PREDFL			; return false (error)
+
+
+SVGMMV:	DEY				; copy memory into buffer to write
+	MOV	<(ACC),Y>,<<BUFFER,X>>
+	INX
+	CPYBN	<#$00>,SVGMMV		; if more, loop
+	RTS				; no, return
+
+	PAGE
+
+OPRSGM:	JSR	L1EBD			; setup for disk I/O
+
+	JSR	DRDBUF			; read in a bufferful
+	JCS	RSGMFL			; fail if error
+
+	LDX	#$00			; check release of game, fail if wrong
+	LDY	#HDRREL
+	LDA	(FRZMEM),Y
+	CMPBN	<BUFFER,X>,L210A
+	INX
+	INY
+	LDA	(FRZMEM),Y
+	CMPBE	<BUFFER,X>,L210D
+L210A:	JMP	RSGMFL
+
+L210D:	LDY	#HDRFLG+1		; preserve SCRIPT flag
+	MOV	<(FRZMEM),Y>,MDFLAG
+
+	INX				; restore PC
+	DMOVI	PRGIDX,ACC
+	LDY	#$03
+	JSR	RSGMMV
+	MOV	<#$00>,PRGUPD
+
+	DMOVI	LOCVAR,ACC		; restore local variables
+	LDY	#$1E
+	JSR	RSGMMV
+
+	DMOVI	STKCNT,ACC		; restore SP and SP save
+	LDY	#$06
+	JSR	RSGMMV
+
+	JSR	DRDBUF			; read a bufferful
+	BCS	RSGMFL			; fail if error
+
+	LDX	#$00			; restore first 256 bytes of stack
+	DMOVI	STKLIM,ACC
+	LDY	#$00
+	JSR	RSGMMV
+
+	JSR	DRDBUF			; read a bufferful
+	BCS	RSGMFL			; fail if error
+
+	LDX	#$00			; restore last 192 bytes of stack
+	DMOVI	STKLIM+$100,ACC
+	LDY	#$C0
+	JSR	RSGMMV
+
+	DMOV	FRZMEM,ACC		; figure out how many pages of
+	LDY	#HDRIMP			; impure storage there are to be
+	MOV	<(FRZMEM),Y>,ACD	; read in, and set up to read first
+	INC	ACD			; one
+
+L2177:	JSR	DRDNXT			; read in next page of impure storage
+	BCS	RSGMFL			; fail if error
+	INC	ACC+1			; increment buffer pointer
+	DECBN	ACD,L2177		; decrement page count, loop if more
+
+	LDA	MDFLAG			; restore SCRIPT flag
+	LDY	#HDRFLG+1
+	STA	(FRZMEM),Y
+
+	JSR	L2005			; make sure we have game disk
+	JMP	PREDTR			; return true (no error)
+
+RSGMFL:	JSR	L2005			; make sure we have game disk
+	JMP	PREDFL			; return false (error)
+
+
+RSGMMV:	DEY				; copy buffer to memory (read)
+	MOV	<BUFFER,X>,<<(ACC),Y>>
+	INX
+	CPYBN	<#$00>,RSGMMV
+	RTS
+
+	PAGE
+
+L21A0:	INC	RNDLOC			; get a 'random' number
+	INC	RNDLOC+1
+	DMOV	RNDLOC,ACC
+	RTS
+
+ENDMSG:	DB	'-- END OF SESSION --'
+ENMSLN	EQU	*-ENDMSG
+
+FTLMSG:	DB	'INTERNAL ERROR #'
+FTMSLN	EQU	*-FTLMSG
+
+FATAL:	JSR	PRNTBF			; flush anything left in buffer
+
+	DMOVI	FTLMSG,ACC		; output fatal message
+	LDX	#FTMSLN
+	JSR	OUTMSG
+
+	DPUL2	ACC			; output address where error detected
+	JSR	PRNTNM
+
+OPENDS:	JSR	PRNTBF			; flush anything left in buffer
+
+	DMOVI	ENDMSG,ACC		; output end of session message
+	LDX	#ENMSLN
+	JSR	OUTMSG
+
+	JSR	PRNTBF			; flush the buffer
+
+HALT:	JMP	HALT			; die horribly
+
+	.DEPHASE
+
+	END	START
+
