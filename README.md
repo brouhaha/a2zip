@@ -20,12 +20,12 @@ The current source code assembles using the Macro Assembler AS:
     http://john.ccac.rwth-aachen.de:8000/as/
 
 ZIP version 1 is only known to have been used for Zork I release 2
-(which might not have been released for the Apple II), and Zork I release 5,
-which for the Apple II was provided on a 13-sector disk.
+(which might not have been released for the Apple II), and Zork I release 5.
+Zork I release 5 was provided for the Apple II on a 13-sector disk, while no
+later releases or other Infocom games were available on 13-sector disks.
 
 ZIP version 2 is only known to have been used for Zork I release 15
-and Zork II release 7. These and all later Infocom games for the Apple II
-were provided on 16-sector disks.
+and Zork II release 7.
 
 Later releases of the Zork games, and many other Infocom games, use
 ZIP version 3. The earliest version 3 interpreter, like the version 1 and
