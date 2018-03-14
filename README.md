@@ -32,8 +32,9 @@ ZIP version 3. The earliest version 3 interpreter, like the version 1 and
 version 2 interpreters, did not have any more specific interpreter revision
 identification. Later version 3 interpreter revisions for the Apple II
 had a revision letter, with revisions A, B, E, H, K, and M known to exist.
-None of the lettered revisions are represented here yes.
+None of the lettered revisions are currently represented here yes.
 
 Eventually game images exceeded the 128KiB limit of ZIP version 3, therefore
-necessitating new ZIP versions 4, 5, and 6, which are not represented here.
+necessitating new ZIP versions 4, 5, and 6, also known as EZIP, XZIP, and YZIP,
+respectively. These are not represented here.
 
