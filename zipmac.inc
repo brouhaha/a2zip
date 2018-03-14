@@ -466,6 +466,23 @@ rtsmi	macro	adr
 label:
 	endm
 
+
+rtop:	macro
+	if	iver<iver3
+	jmp	mnloop
+	else
+	rts
+	endif
+	endm
+
+
+rtopeq:	macro
+	bne	label
+	rtop
+label:
+	endm
+
+
 dtst	macro	addr
 	lda	addr+1
 	ora	addr
@@ -716,6 +733,11 @@ cmpre	macro	adr1
 	rtseq
 	endm
 
+cmprn	macro	adr1
+	cmp	adr1
+	rtsne
+	endm
+
 cpxbe	macro	adr1,adr2
 	cpx	adr1
 	beq	adr2
@@ -734,4 +756,14 @@ cpxrgt	macro	adr1
 cpybn	macro	adr1,adr2
 	cpy	adr1
 	bne	adr2
+	endm
+
+fillto	macro	addr, val
+	while	* < addr
+size	set	addr-*
+	if	size > 256
+size	set	256
+	endif
+	fcb	[size] val
+	endm
 	endm

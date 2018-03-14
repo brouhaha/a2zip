@@ -1,4 +1,4 @@
-; Infocom ZIP release 3 interpreter for Apple II,
+; Infocom ZIP interpreter for Apple II,
 ; partially reverse-engineered by Eric Smith
 
 ; The ZIP interpreter is copyrighted by Infocom, Inc.
@@ -7,13 +7,52 @@
 
 	cpu	6502
 
+
+iver1	equ	1	; interp for Z-machine release 1
+			; only known to be used by Zork I release 2 and 5
+
+iver2	equ	2	; interp for Z-machine release 2
+			; only known to be used by Zork I release 15
+			; and Zork II release 7
+
+; The following are all interpreter versions for Z-machine release 3
+iver3	equ	3
+iver3a	equ	4	; NOT YET SUPPORTED
+iver3b	equ	5	; NOT YET SUPPORTED
+iver3e	equ	8	; NOT YET SUPPORTED
+iver3h	equ	11	; NOT YET SUPPORTED
+iver3k	equ	14	; NOT YET SUPPORTED
+iver3m	equ	16	; NOT YET SUPPORTED
+
+
+	ifndef	iver
+iver	equ	iver3
+	endif
+
+
+	ifndef	rwtssz
+	if	iver==iver1
+rwtssz	equ	$0700
+	else
+rwtssz	equ	$0800
+	endif
+	endif
+
+
 lc40	equ	0			; 40 column lower case patch
+
 
 ; define memory usage
 
-zporg	equ	$7f			; origin of zero page usage
+zporg	equ	$7c			; origin of zero page usage
 buffer	equ	$0200			; I/O buffer
-stckmx	equ	$e0			; maximum size of stack in words
+
+	if	iver<iver3
+stckmx	equ	180			; maximum size of stack in words
+	else
+stckmx	equ	224			; maximum size of stack in words
+	endif
+
 stcklc	equ	$03e8			; base address of stack (works down)
 stklim	equ	stcklc-2*stckmx		; lower limit of stack
 
@@ -21,8 +60,13 @@ prtflg	equ	$0779			; printer flags
 
 mainor	equ	$0800			; origin of main program
 vmtorg	equ	mainor+$1a00		; origin of virtual memory tables
-rwtsor	equ	vmtorg+$0200		; origin of RWTS routines
-firflc	equ	rwtsor+$0800		; first location available
+vmtend	equ	vmtorg+$0200
+
+rwtsor	equ	vmtend			; origin of RWTS routines
+rwts	equ	rwtsor+$0500		; entry point of RWTS routines
+rwtsen	equ	rwtsor+rwtssz
+
+firflc	equ	rwtsen			; first location available
 lstflc	equ	$c000-1			; last potential location available
 
 vmt1lc	equ	vmtorg+$0000		; virtual memory page tables
@@ -30,7 +74,6 @@ vmt2lc	equ	vmtorg+$0080
 vmt3lc	equ	vmtorg+$0100
 vmt4lc	equ	vmtorg+$0180
 
-rwts	equ	rwtsor+$0500		; entry point of RWTS routines
 
 
 ; Control characters
@@ -74,6 +117,7 @@ cout1	equ	$fdf0			; output a char to screen
 
 	org	zporg
 
+s7c	rmb	3			; subroutine used in iver<iver3
 secptk	rmb	1			; number of sectors per track on disk
 
 opcode	rmb	1			; opcode of current instruction
@@ -133,20 +177,28 @@ ldf	rmb	1
 le0	rmb	1
 le1	rmb	1
 
+	if	iver>=iver2
 sbwdpt	rmb	2
+	endif
 
 acb	rmb	2
 acc	rmb	2
 acd	rmb	2
+
+	if	iver==iver1
+rndbuf	rmb	4
+	endif
 
 mdflag	rmb	1			; negative arg count for mul/div
 
 chrptr	rmb	1			; char out buffer pointer
 chrpt2	rmb	1			; char out buffer pointer 2
 lincnt	rmb	1			; output line counter
+	
 prcswl	rmb	2			; CSWL vector contents for printer
 
-	rmb	3
+prgids	rmb	1			; prgidx save
+prglps	rmb	2			; prglpg save
 
 stltyp	rmb	1			; status line type (time vs. score)
 
@@ -197,7 +249,11 @@ l0805:	sta	$00,x
 	ldx	#$ff			; init hardware stack
 	txs
 
+	if	iver<iver3
+	dmovi2	$c100,prcswl
+	else
 	jsr	initsc			; init and clear screen window
+	endif
 
 	mov	#$00,prgupd,auxupd	; indicate no pages loaded
 
@@ -213,7 +269,14 @@ l0805:	sta	$00,x
 
 	ldy	#$00			; init virtual memory tables
 	ldx	#$80
-l084a:	lda	#$ff
+
+l084a:
+	if	iver<iver3
+	lda	#$00
+	else
+	lda	#$ff
+	endif
+
 	sta	(vmtab1),y
 	sta	(vmtab2),y
 	tya
@@ -235,9 +298,17 @@ l084a:	lda	#$ff
 
 	dmovi	firflc,frzmem		; init memory pointers
 
+	if	iver<iver3
+	jsr	s1e36
+	endif
+
 	dmov	frzmem,acc		; read log page 0 to first frozen page
 	dmovi	$0000,acb
+
 	jsr	drdbkf
+	if	iver<iver3
+	jcs	start
+	endif
 
 	ldy	#hdrfrz+1		; setup frozen storage page count
 	lda	#$ff			; bump up to page boundary - 1
@@ -258,14 +329,26 @@ l0897:	add	,#$01
 	pha
 	sta	acb
 	mov	#$00,acb+1
+
 	jsr	drdbkf
+	if	iver<iver3
+	jcs	start
+	endif
+
 	pla
 	jmp	l0897
 
-l08b6:	ldy	#hdrtyp			; setup for proper type of statu sline
+l08b6:	ldy	#hdrtyp
 	lda	(frzmem),y
-	and	#$02
+
+	if	iver<iver3
+	and	#$01
+	eor	#$01
+	beq	l090a
+	else
+	and	#$02			; setup for proper type of status line
 	sta	stltyp
+	endif
 
 	ldy	#hdrstr+1		; init PC
 	lda	(frzmem),y
@@ -284,6 +367,7 @@ l08b6:	ldy	#hdrtyp			; setup for proper type of statu sline
 	adc	frzmem+1
 	sta	glbvar+1
 
+	if	iver>=iver2
 	ldy	#hdrsbw+1		; init sub-word table pointer
 	lda	(frzmem),y
 	sta	sbwdpt
@@ -292,6 +376,7 @@ l08b6:	ldy	#hdrtyp			; setup for proper type of statu sline
 	clc
 	adc	frzmem+1
 	sta	sbwdpt+1
+	endif
 
 	mov	#$00,swpmem		; swpmem := frzmem + 256 * frzpgs
 	add	frzpgs,frzmem+1,swpmem+1
@@ -307,6 +392,21 @@ l08b6:	ldy	#hdrtyp			; setup for proper type of statu sline
 	lda	#$ff
 	sta	(vmtab3),y
 
+	if	iver==iver1
+	sta	rndbuf
+	sta	rndbuf+1
+	sta	rndbuf+2
+	sta	rndbuf+3
+
+	lda	#$05
+l0917:	pha
+	jsr	getrnd
+	pla
+	sec
+	sbc	#$01
+	bne	l0917
+	endif
+
 	jmp	mnloop			; start the game!
 
 l090a:	jsr	fatal
@@ -321,13 +421,23 @@ optab1:	fdb	oprtnt			; return with TRUE
 	fdb	opnull			; no-op
 	fdb	opsvgm			; save game status to disk
 	fdb	oprsgm			; restore game status from disk
+
+	if	iver<iver3
+	fdb	oprstg			; restart game
+	else
 	fdb	start			; restart game
+	endif
+
 	fdb	oprtnv			; return with value
-	fdb	pullwd			; drop a word from the stack
+	fdb	opdrop			; drop a word from the stack
 	fdb	opends			; end the game
 	fdb	opcrlf			; print CRLF
+
+	if	iver>=iver3
 	fdb	opprst			; print status line
 	fdb	opcksm			; checksum the program
+	endif
+
 opmax1	equ	(*-optab1)/2
 
 
@@ -341,7 +451,7 @@ optab2:	fdb	optstz			; compare ARG1=0 (ARG1<>0)
 	fdb	opinc			; increment variable
 	fdb	opdec			; decrement variable
 	fdb	oppsb			; print string at byte address
-	fdb	fatal
+	fdb	opfatl
 	fdb	opdstt			; destroy thing
 	fdb	opprtn			; print thing name
 	fdb	oprtn			; return
@@ -355,7 +465,7 @@ opmax2	equ	(*-optab2)/2
 ; class A instructions (variable number of operands, may use short form
 ; opcode)
 
-optab3:	fdb	fatal
+optab3:	fdb	opfatl
 	fdb	opmtch			; match ARG1 against ARG2, ARG3, or ARG4
 	fdb	l0eb7			; ??? compare ARG1<=ARG2 (ARG1>ARG2)
 	fdb	l0ecf			; ??? compare ARG1>=ARG2 (ARG1<ARG2)
@@ -371,7 +481,7 @@ optab3:	fdb	fatal
 	fdb	l0f97			; move ARG2 into var ARG1
 	fdb	opmovt			; move thing ARG1 into thing ARG2
 	fdb	opgtwd			; get a word
-	fdb	opgtby			; store a word
+	fdb	opgtby			; get a byte
 	fdb	opgtp			; get thing property
 	fdb	opgtpa			; get address of property
 	fdb	opgtnp			; get next property
@@ -380,6 +490,9 @@ optab3:	fdb	fatal
 	fdb	opmul			; multiply
 	fdb	opdiv			; divide
 	fdb	oprmd			; remainder
+	if	iver==iver1
+	fdb	oppsbi			; print string at indexed byte address
+	endif
 opmax3	equ	(*-optab3)/2
 
 
@@ -398,7 +511,13 @@ optab4:	fdb	opcall			; call procedure
 opmax4	equ	(*-optab4)/2
 
 
-mnloop:	mov	#$00,argcnt		; default no arguments
+mnloop:
+	if	iver<iver3
+	mov	prgidx,prgids
+	dmov	prglpg,prglps
+	endif
+
+	mov	#$00,argcnt		; default no arguments
 
 	jsr	ftprba			; get opcode
 	sta	opcode
@@ -457,10 +576,29 @@ l09ed:	dmovi	optab4,acc		; assume class D
 	cmpjl	#$e0,l0a98
 
 	sbc	#$e0			; adjust to $00..$1F
-	cmpbg	#opmax4,l0a2b		; make sure it's not illegal
+	cmp	#opmax4			; make sure it's not illegal
+
+	if	iver<iver3
+	jge	opfatl
+	else
+	bge	l0a2b
+	endif
 
 godoit:	asl	a			; get address from table (base in ACC)
 	tay				;   word indexed by A and execute
+
+	if	iver<iver3
+
+	lda	(acc),y
+	sta	acb
+	iny
+	lda	(acc),y
+	sta	acb+1
+	jsr	s7c			; call a patch point in zero page, normally an rts
+	jmp	(acb)
+
+	else
+
 	lda	(acc),y
 	sta	dsptch+1
 	iny
@@ -469,17 +607,27 @@ godoit:	asl	a			; get address from table (base in ACC)
 dsptch:	jsr	dsptch
 	jmp	mnloop
 
+	endif
 
 ; process opcode group C ($80-$BF)
 
 opcgpc:	sub	,#$b0			; adjust to $00..$0F
-	cmpbg	#opmax1,l0a2b		; make sure it's not illegal
+	cmp	#opmax1			; make sure it's not illegal
+
+	if	iver<iver3
+	jge	opfatl
+	else
+	bge	l0a2b
+	endif
+
 	pha				; save it temp.
 	dmovi	optab1,acc		; get base address of proper table
 	pla
 	jmp	godoit
 
+	if	iver>=iver3
 l0a2b:	jsr	fatal			; oops!  illegal opcode
+	endif
 
 
 ; process opcode group B ($80-$AF)
@@ -495,7 +643,14 @@ l0a45:	mov	#$01,argcnt		; one argument
 
 	lda	opcode			; adjust opcode to $00..$0F
 	and	#$0f
-	cmpbg	#opmax2,l0a2b		; make sure it's not illegal
+	cmp	#opmax2			; make sure it's not illegal
+
+	if	iver<iver3
+	jge	opfatl
+	else
+	bge	l0a2b
+	endif
+
 	pha				; save tmep.
 	dmovi	optab2,acc		; get appropriate table base addr
 	pla
@@ -519,7 +674,14 @@ l0a8a:	dmov	acc,arg2		; save it
 
 	lda	opcode			; get opcode back
 l0a98:	and	#$1f			; adjust to $00..$1F
-	cmpbg	#opmax3,l0a2b		; make sure it's not illegal
+	cmp	#opmax3			; make sure it's not illegal
+
+	if	iver<iver3
+	jge	opfatl
+	else
+	bge	l0a2b
+	endif
+
 	pha				; save temp.
 	dmovi	optab3,acc		; get base addr of appropriate table
 	pla
@@ -595,7 +757,15 @@ l0b26:	jsr	pullwd
 ptvrpz:	lda	#$00			; store 0 in var. ind. by program
 ptvrpa:	sta	acc			; store byte in A in var. ind. by prog.
 	mov	#$00,acc+1
-ptvrp1:	jmp	ptvarp			; unnecessary!!!
+
+
+ptvrp1:
+	if	iver<iver3
+	jsr	ptvarp
+	jmp	mnloop
+	else
+	jmp	ptvarp			; unnecessary!!!
+	endif
 
 ptvarp:	dpsh	acc			; store ACC in var. ind. by program
 	jsr	ftprba
@@ -640,7 +810,8 @@ predfl:	jsr	ftprba			; fetch first displacement byte
 
 l0b94:	and	#$40			; branch not taken
 	jsreq	ftprba			; fetch second displacement byte if
-	rts				; necessary and discard it
+					; necessary and discard it
+	rtop				; done
 
 l0b9c:	tax				; branch take, save first disp. byte
 	and	#$40			; do we need a second byte?
@@ -692,7 +863,13 @@ l0bfc:	sta	prgidx
 
 	mov	#$00,prgupd		; indicate page chagne
 
-l0c17:	rts				; all done
+					; all done
+	if	iver<iver3
+	jmp	mnloop
+l0c17:	jmp	mnloop
+	else
+l0c17:	rts
+	endif
 
 
 oprtnt:	lda	#$01			; return true ($01)
@@ -704,7 +881,15 @@ oprtnf:	lda	#$00			; return false ($00)
 	jmp	l0c1a
 
 
-oppsi:	mov	prgidx,auxidx		; copy PC to AUX
+	if	iver<iver3
+oppsi:	jsr	psi
+	jmp	mnloop
+	else
+oppsi:
+	endif
+	
+
+psi:	mov	prgidx,auxidx		; copy PC to AUX
 	dmov	prglpg,auxlpg
 	mov	#$00,auxupd		; indicate new log. page
 
@@ -715,17 +900,26 @@ oppsi:	mov	prgidx,auxidx		; copy PC to AUX
 	mov	auxupd,prgupd
 	dmov	auxmpt,prgmpt
 
-opnull:	rts				; done
+	if	iver>=iver3
+opnull:
+	endif
+
+	rts
 
 
-oppsic:	jsr	oppsi			; print string immediate
+oppsic:	jsr	psi			; print string immediate
 
 	lda	#crchar			; print CRLF (could use JSR OPCRLF)
 	jsr	bfchar
 	lda	#lfchar
 	jsr	bfchar
-
+	
 	jmp	oprtnt			; return true
+
+
+	if	iver<iver3
+opnull:	jmp	mnloop
+	endif
 
 
 oprtnv:	jsr	pullwd			; pull value off stack
@@ -733,11 +927,26 @@ oprtnv:	jsr	pullwd			; pull value off stack
 	jmp	oprtn			; return with it
 
 
-opcrlf:	lda	#crchar			; print CRLF
+	if	iver<iver3
+opdrop:	jsr	pullwd
+	jmp	mnloop
+	endif	
+
+
+opcrlf:
+	lda	#crchar			; print CRLF
 	jsr	bfchar
 	lda	#lfchar
-	jmp	bfchar			; implicit RTS
 
+	if	iver<iver3
+	jsr	bfchar
+	jmp	mnloop
+	else
+	jmp	bfchar			; implicit RTS
+	endif
+
+
+	if	iver>=iver3
 
 opcksm:	ldy	#hdrcka+1		; get checksum end log. address (word
 	lda	(frzmem),y		;   index)
@@ -778,6 +987,8 @@ l0ca5:	jsr	ftaxba			; get a byte
 
 l0cda:	jmp	predfl
 
+	endif
+
 
 optstz:	dtstjn	arg1,predfl
 l0ce6:	jmp	predtr
@@ -815,8 +1026,23 @@ opgtpl:	dadd	arg1,frzmem,acc
 	jmp	ptvrpa
 
 
+	if	iver<iver3
+
+opinc:	jsr	incvar
+	jmp	mnloop
+
+opdec:	jsr	decvar
+	jmp	mnloop
+	
+	endif
+
+
+	if	iver>=iver3
+opinc:
+	endif
+
 ; increment variable ARG1
-opinc:	lda	arg1
+incvar:	lda	arg1
 	jsr	gtvra1
 	dinc	acc
 l0d4e:	dpsh	acc
@@ -826,9 +1052,13 @@ l0d4e:	dpsh	acc
 	rts
 
 
+	if	iver>=iver3
+opdec:
+	endif
+
 ; decrement variable ARG1
 
-opdec:	lda	arg1
+decvar:	lda	arg1
 	jsr	gtvra1
 	ddec	acc
 	jmp	l0d4e
@@ -837,13 +1067,26 @@ opdec:	lda	arg1
 ; print string at byte address in ARG1
 
 oppsb:	dmov	arg1,acc		; set AUX to point to string at
-	jsr	setaxb			;   byte address
+oppsb2:	jsr	setaxb			;   byte address
 	jmp	l0e9d			; and print it!
 
 
+	if	iver==iver1
+opfatl:	jmp	fatal
+	elseif	iver==iver2
+opfatl:	jsr	fatal
+	endif
+
+
+opdstt:
+	if	iver<iver3
+	jsr	dstthg
+	jmp	mnloop
+	endif
+
 ; destroy thing ARG1 (move to location 0)
 
-opdstt:	lda	arg1
+dstthg:	lda	arg1
 	jsr	setupt
 	ldy	#thgpar
 	lda	(acc),y
@@ -879,8 +1122,16 @@ l0dd2:	dpul	acc
 	rts
 
 
-opprtn:	lda	arg1			; print thing name
-l0de4:	jsr	setupt			; set up pointer to thing
+opprtn:	lda	arg1
+
+	if	iver<iver3
+	jsr	prtnam
+	jmp	mnloop
+	endif
+
+
+; print thing name
+prtnam:	jsr	setupt			; set up pointer to thing
 
 	ldy	#thgprp			; get address of thing's property list
 	lda	(acc),y
@@ -943,7 +1194,14 @@ opjump:	dmov	arg1,acc		; setup to jump into middle of
 
 oppsw:	dmov	arg1,acc		; set AUX to point to string at
 	jsr	setaxw			;   word address
-l0e9d:	jmp	prntst			; and print it!
+
+l0e9d:
+	if	iver<iver3
+	jsr	prntst			; and print it!
+	jmp	mnloop
+	else
+	jmp	prntst			; and print it!
+	endif
 
 
 opmove:	lda	arg1			; get number of first variable
@@ -966,11 +1224,21 @@ l0ecf:	dmov	arg1,acb
 	bcc	l0f10
 	jmp	predfl
 
-opdecb:	jsr	opdec
+opdecb:
+	if	iver<iver3
+	jsr	decvar
+	else
+	jsr	opdec
+	endif
 	dmov	arg2,acb
 	jmp	l0f08
 
-opincb:	jsr	opinc
+opincb:
+	if	iver<iver3
+	jsr	incvar
+	else
+	jsr	opinc
+	endif
 	dmov	acc,acb
 	dmov	arg2,acc
 l0f08:	jsr	l16de
@@ -1026,7 +1294,7 @@ opseta:	jsr	setupa
 	lda	acb+1
 	ora	acd+1
 	sta	(acc),y
-	rts
+	rtop
 
 
 ; clear attribute bit ARG2 of thing ARG1
@@ -1042,14 +1310,21 @@ opclra:	jsr	setupa
 	eor	#$ff
 	and	acb+1
 	sta	(acc),y
-	rts
+	rtop
 
 
 l0f97:	dmov	arg2,acc
 	lda	arg1
-l0fa1:	jmp	ptvra1
+l0fa1:
+	if	iver<iver3
+	jsr	ptvra1
+	jmp	mnloop
+	else
+	jmp	ptvra1
+	endif
 
-opmovt:	jsr	opdstt
+
+opmovt:	jsr	dstthg
 	lda	arg1
 	jsr	setupt
 	dpsh	acc
@@ -1067,7 +1342,9 @@ opmovt:	jsr	opdstt
 	beq	l0fd1
 	ldy	#thgsib
 	sta	(acc),y
-l0fd1:	rts
+l0fd1:
+	rtop
+
 
 opgtwd:	dasl	arg2
 	dadd	arg2,arg1,acc
@@ -1218,6 +1495,19 @@ oprmd:	dmov	arg1,acc
 	jmp	ptvrp1
 
 
+	if	iver==iver1
+; print string at indexed byte address (arg+arg2)
+oppsbi:	clc
+	lda	arg2
+	adc	arg1
+	sta	acc
+	lda	arg2+1
+	adc	arg1+1
+	sta	acc+1
+	jmp	oppsb2
+	endif
+
+
 ; test whether ARG1 is equal to any of the other args
 
 opmtch:	ldx	argcnt
@@ -1328,7 +1618,7 @@ l124c:	pul	acc			; get first porgram byte again
 	mov	stkcnt,stkcsv		; save the stack pointer and count
 	dmov	stkpnt,stkpsv
 
-	rts				; all done!
+	rtop
 
 
 ; store word ARG3 at log. addr. ARG2 (offset) * 2 + ARG1 (base)
@@ -1353,7 +1643,7 @@ opptwd:	lda	arg2			; calculate logical address
 	lda	arg3
 	sta	(acc),y
 
-	rts				; and return
+	rtop
 
 
 ; store byte ARG3 at log. addr. ARG2 (offset) + ARG1 (base)
@@ -1373,7 +1663,7 @@ opptby:	lda	arg2			; calculate logical address
 	lda	arg3
 	sta	(acc),y
 
-	rts				; and return
+	rtop
 
 
 ; store ARG3 as property of ARG2 of thing ARG1
@@ -1381,7 +1671,8 @@ opptby:	lda	arg2			; calculate logical address
 opptp:	jsr	setupp			; setup for thing property operations
 
 l12ac:	jsr	gtpnum			; get the property number
-	cmpbe	arg2,l12be		; if it is the one, go do it!
+	cmp	arg2			; if it is the one, go do it!
+	beq	l12be
 
 	jsrcc	fatal			; oops! past it!
 
@@ -1392,7 +1683,8 @@ l12ac:	jsr	gtpnum			; get the property number
 
 l12be:	jsr	gtplen			; get property length
 	iny
-	cmpbe	#$00,l12d7		; if it is byte sized, go store it
+	cmp	#$00			; if it is byte sized, go store it
+	beq	l12d7
 	cmpjsn	#$01,fatal		; if it isn't word sized, fatal error
 
 	lda	arg3+1			; yes, store high byte
@@ -1401,14 +1693,19 @@ l12be:	jsr	gtplen			; get property length
 
 	lda	arg3			; these three lines are unnecessary
 	sta	(acc),y
-	rts
+
+	rtop
 
 l12d7:	lda	arg3			; store low byte
 	sta	(acc),y
-	rts				; and return
+
+	rtop
 
 
 opgtln:	jsr	opprst
+	if	iver==iver1
+	jsr	getrnd
+	endif
 	dadd	arg1,frzmem,arg1
 	dadd	arg2,frzmem,arg2
 	jsr	getlin
@@ -1423,8 +1720,12 @@ l1310:	ldy	#$00
 	lda	(arg2),y
 	iny
 	cmp	(arg2),y
-	rtseq
-	dtstre	acd
+	rtopeq
+
+	lda	acd+1
+	ora	acd
+	rtopeq
+
 	lda	acd
 	cmpjse	#$06,l13ba
 	lda	acd
@@ -1575,12 +1876,28 @@ l1445:	ldy	#$00
 l144a:	lda	(acc),y
 	cmpbg	pkword+1,l1470
 l1450:	daddb1	acc,acd,acc
+
+	if	iver<iver3
+
+	sec
+	lda	acb
+	sbc	#$10
+	sta	acb
+	bcs	l144a
+	dec	acb+1
+	bpl	l144a
+
+	else
+
 	dsubb1	acb,#$10,acb
 	lda	acb+1
 	bmi	l1470
 	bne	l144a
 	lda	acb
 	bne	l144a
+
+	endif
+
 l1470:	dsubb1	acc,acd,acc
 	daddb1	acb,#$10,acb
 	lda	acd
@@ -1621,13 +1938,23 @@ l14d7:	dsub	acc,frzmem,acb
 ; print ASCII character ARG1
 
 opprch:	lda	arg1
+	if	iver<iver3
+	jsr	bfchar
+	jmp	mnloop
+	else
 	jmp	bfchar
+	endif
 
 
 ; print decimal number ARG1
 
 opprnm:	dmov	arg1,acc
+	if	iver<iver3
+	jsr	prntnm
+	jmp	mnloop
+	else
 	jmp	prntnm			; unnecessary
+	endif
 
 
 ; print decimal number in ACC
@@ -1661,7 +1988,7 @@ l152e:	lda	#'-'			; get code for '-'
 ; get a random number from 1 to ARG1
 
 oprndm:	dmov	arg1,acb		; save range
-	jsr	l21a0			; get the "random" number
+	jsr	getrnd			; get the "random" number
 	jsr	divide			; divide by range
 	dmov	acb,acc			; get the remainder
 	dinc	acc			; increment it (base of result is 1)
@@ -1671,7 +1998,12 @@ oprndm:	dmov	arg1,acb		; save range
 ; push ARG1 on stack
 
 oppush:	dmov	arg1,acc
+	if	iver<iver3
+	jsr	pushwd
+	jmp	mnloop
+	else
 	jmp	pushwd
+	endif
 
 
 ; pull stack into variable ARG1
@@ -1679,6 +2011,44 @@ oppush:	dmov	arg1,acc
 oppull:	jsr	pullwd
 	lda	arg1
 	jmp	l0fa1
+
+
+	if	iver==iver1
+getrnd:	lda	#2
+l1599:	pha
+	ldy	#8
+	ldx	#0
+	lda	rndbuf,x
+l15a0:	rol	a
+	rol	a
+	rol	a
+	eor	rndbuf,x
+	rol	a
+	rol	a
+	ldx	#0
+	rol	rndbuf,x
+	inx
+	rol	rndbuf,x
+	inx
+	rol	rndbuf,x
+	inx
+	rol	rndbuf,x
+	dey
+	bne	l15a0
+	pla
+	sec
+	sbc	#1
+	bne	l1599
+	lda	rndbuf+2
+	sta	acc
+	lda	rndbuf+3
+	sta	acc+1
+	lda	rndloc
+	sta	rndbuf
+	lda	rndloc+1
+	sta	rndbuf+1
+	rts
+	endif
 
 
 l1568:	dpsh	acd
@@ -1860,6 +2230,7 @@ l16e9:	lda	acc+1
 	cmp	acb
 l16f3:	rts
 
+
 pushwd:	ddec	stkpnt
 	ldy	#$00
 	lda	acc
@@ -1871,6 +2242,11 @@ pushwd:	ddec	stkpnt
 	lda	stkcnt
 	cmpjsg	#stckmx,fatal
 	rts
+
+
+	if	iver>=iver3
+opdrop:
+	endif
 
 pullwd:	ldy	#$00
 	lda	(stkpnt),y
@@ -1938,6 +2314,9 @@ l1790:	dmov	swpmem,acc		; setup to read the page
 	dmov	prglpg,acb
 
 	jsr	drdbkf			; read the page (die if error)
+	if	iver<iver3
+	jcs	start
+	endif
 
 	ldy	prgppg			; copy the new log. page number into
 	lda	prglpg			; the VM table
@@ -1970,6 +2349,24 @@ setaxw:	lda	acc
 	rol	a
 	sta	auxlpg+1
 	jmp	l17c4
+
+
+	if	iver==iver1
+l1846:	lda	#$00
+	sta	auxupd
+	lda	#$01
+	jsr	fndpag
+	sta	auxppg
+	jsr	l1832
+	jsr	mrkpag
+	lda	auxppg
+	clc
+	adc	swpmem+1
+	sta	auxmpt+1
+	lda	swpmem
+	sta	auxmpt
+	rts
+	endif
 
 
 ; fetch next word from AUX into ACC
@@ -2007,7 +2404,11 @@ l1807:	cmpbl	frzpgs,l1822
 l180b:	dmov	auxlpg,acc		; no, see if it is swapped in
 	jsr	fndpag
 	sta	auxppg			; save phys. page no.
-	bcs	l1832			; not fount
+	if	iver==iver1
+	bcs	l183a
+	else
+	bcs	l1832			; not found
+	endif
 
 ; we have the swappable page, fix up the pointers, etc.
 
@@ -2027,15 +2428,28 @@ l1822:	add	,frzmem+1,auxmpt+1	; add base of memory
 
 ; we need to load the page from disk
 
-l1832:	cmpbn	prgppg,l183a		; if we are about to load a new logical
+l1832:
+	if	iver==iver1
+	cmprn	prgppg
+	tax
+	lda	#$00
+	sta	prgupd
+	txa
+	rts
+	else
+	cmpbn	prgppg,l183a		; if we are about to load a new logical
 	mov	#$00,prgupd		; page into the physical page the PC
 					; points to, mark it as a new page
+	endif
 
 l183a:	dmov	swpmem,acc		; setup to read the page
 	add	auxppg,acc+1,acc+1
 	dmov	auxlpg,acb
 
 	jsr	drdbkf			; read the page (die if error)
+	if	iver<iver3
+	jcs	start
+	endif
 
 	ldy	auxppg			; copy the new log. page number into
 	lda	auxlpg			; the VM table
@@ -2050,7 +2464,17 @@ l183a:	dmov	swpmem,acc		; setup to read the page
 ; we've just started using a new logical page, move it to the front of our list
 ; this makes least recently used pages first candidates to be removed
 
-mrkpag:	cmpbe	mrupag,l1891
+mrkpag:
+	if	iver==iver1
+	cmp	mrupag
+	bne	l18fa
+	lda	mrupag
+	rts
+l18fa:
+	else
+	cmpbe	mrupag,l1891
+	endif
+
 	ldx	mrupag
 	sta	mrupag
 	tay
@@ -2108,8 +2532,18 @@ donext:	jsr	getnyb
 	rtscs
 	sta	acd
 	beq	dospac
+	if	iver==iver1
+	cmpbe	#$01,docrlf
+	cmpbl	#$04,newmod
+	cmpbl	#$06,newmdl
+	elseif	iver==iver2
+	cmpbe	#$01,dosbwd
+	cmpbl	#$04,newmod
+	cmpbl	#$06,newmdl
+	else
 	cmpbl	#$04,dosbwd
 	cmpbl	#$06,newmod
+	endif
 	jsr	tstmod
 	tstabn	l18e2
 	lda	#$5b
@@ -2122,9 +2556,13 @@ l18e2:	cmpbn	#$01,dospcl
 
 dospcl:	sub	acd,#$07
 	bcc	doasci
+	if	iver>iver1
 	beq	docrlf
+	endif
 	tay
+	if	iver>iver1
 	dey
+	endif
 	lda	spclch,y
 	jmp	l18dc
 
@@ -2137,6 +2575,13 @@ doasci:	jsr	getnyb
 	sta	acd
 	pla
 	ora	acd
+
+	if	iver==iver1
+	cmp	#$09		; tab
+	bne	l18dc
+	lda	#' '
+	endif
+
 	jmp	l18dc
 
 
@@ -2148,6 +2593,9 @@ docrlf:	lda	#crchar
 	lda	#lfchar
 	jmp	l18dc
 
+
+	if	iver>=iver3
+	
 newmod:	sub	,#$03
 	tay
 	jsr	tstmod
@@ -2160,11 +2608,32 @@ l192d:	sty	prmmod
 	sty	prmmod
 l1937:	jmp	donext
 
+	else
+
+newmod:	jsr	tstmod
+	add	,#$02
+	adc	acd
+	jsr	wrapmd
+	sta	tmpmod
+	jmp	donext
+
+newmdl:	jsr	tstmod
+	add	,acd
+	jsr	wrapmd
+	sta	prmmod
+	jmp	donext
+
+	endif
+
+
+	if	iver>=iver2
+
+	if	iver>iver2
 
 l193a:	fcb	$00
 
-dosbwd:	deca
-	rept	6
+dosbwd:	deca			; ver 3: 96 abbrevs
+	rept	6		; first nybble 1..3 is base, 32*n-1
 	asl	a
 	endm
 	sta	l193a
@@ -2172,6 +2641,15 @@ dosbwd:	deca
 	asl	a
 	adc	#$01
 	adc	l193a
+
+	elseif	iver==iver2
+
+dosbwd:	jsr	getnyb		; ver 2: only 32 abbrevs
+	asl	a
+	adc	#$01
+
+	endif
+
 	tay
 	lda	(sbwdpt),y
 	sta	acc
@@ -2192,7 +2670,29 @@ dosbwd:	deca
 	mov	#$ff,tmpmod
 	jmp	donext
 
-spclch:	fcb	"0123456789.,!?_#'\"/\\-:()"
+	endif
+
+
+	if	iver<iver3
+wrapmd:	cmp	#$03
+	bcc	wrapm1
+	sec
+	sbc	#$03
+	jmp	wrapmd
+wrapm1:	rts
+
+	endif
+
+
+spclch:	fcb	"0123456789"
+	fcb	".,!?_#'"
+	fcb	$22		; double quote
+	fcb	"/"
+	fcb	$5c		; backslash
+	if	iver==iver1
+	fcb	"|"
+	endif
+	fcb	"-:()"
 
 tstmod:	lda	tmpmod
 	bpl	l19b4
@@ -2247,7 +2747,13 @@ l19ff:	lda	pnybbf
 
 ; crunch word to compare with vocab table entries
 
-crnwrd:	ldx	#$00
+crnwrd:
+	if	iver<=iver2
+	lda	#$00
+	sta	prmmod
+	endif
+
+	ldx	#$00
 	ldy	#$06
 l1a09:	lda	#$05
 	sta	pkword,x
@@ -2262,15 +2768,98 @@ l1a1b:	ldx	acc
 	bne	l1a2a
 	lda	#$05
 	jmp	l1a52
-l1a2a:	lda	acd
+
+l1a2a:
+	if	iver==iver1
+	cmp	#' '
+	bne	l1a86
+	lda	#$00
+	jmp	l1a52
+l1a86:	cmp	#$0d
+	bne	l1a9e
+	ldx	acc
+	lda	inword,x
+	cmp	#$0a
+	beq	l1a97
+	lda	#$0d
+	jmp	l1a9e
+l1a97:	inc	acc
+	lda	#$01
+	jmp	l1a52
+l1a9e:
+	endif
+
+	if	iver<iver3
+
+	lda	acb
+	pha
+	lda	acd
+	jsr	tstchr
+	sta	acb
+	cmp	prmmod
+	beq	l1a43
+	ldx	acc
+	lda	inword,x
+	jsr	tstchr
+	cmp	acb
+	bne	l1a91
+	sec
+	sbc	prmmod
+	add	,#$03
+	jsr	wrapmd
+	add	,#$03
+	sta	acb+1
+	lda	acb
+	sta	prmmod
+	pla
+	sta	acb
+	lda	acb+1
+	ldx	acb
+	sta	pkword,x
+	inc	acb
+	dec	acd+1
+	jeq	l1aca
+	lda	acb
+	pha
+	jmp	l1a43
+
+l1a91:	lda	acb
+	sec
+	sbc	prmmod
+	add	,#$03
+	jsr	wrapmd
+	tax
+	inx
+	pla
+	sta	acb
+	txa
+	
+	elseif	iver==iver3
+	
+	lda	acd
 	jsr	tstchr
 	tstabe	l1a43
 	add	,#$03
+
+	endif
+
 	ldx	acb
 	sta	pkword,x
 	inc	acb
 	decje	acd+1,l1aca
-l1a43:	lda	acd
+
+	if	iver<iver3
+	lda	acb
+	pha
+	endif
+
+l1a43:
+	if	iver<iver3
+	pla
+	sta	acb
+	endif
+	
+	lda	acd
 	jsr	tstchr
 	decabp	l1a62
 	sub	acd,#$5b
@@ -2303,6 +2892,7 @@ l1a6c:	lda	acd
 	and	#$1f
 	jmp	l1a52
 
+
 l1a99:	ldx	#$24
 l1a9b:	cmp	spclch,x
 	beq	l1aa6
@@ -2310,7 +2900,11 @@ l1a9b:	cmp	spclch,x
 	ldy	#$00
 	rts
 l1aa6:	txa
+	if	iver==iver1
+	add	,#$07
+	else
 	add	,#$08
+	endif
 	rts
 
 tstchr:	cmpbl	#'a',l1ab6
@@ -2354,6 +2948,20 @@ l1aca:	lda	pkword+1
 	rts
 
 
+	if	iver<iver3
+oprstg:	jsr	prntbf
+	jmp	start
+	endif
+
+
+	if	iver==iver1
+opends:	jsr	prntbf
+	fcb	$00		; brk
+	endif
+
+
+	if	iver>=iver3
+
 ; init output routine and screen window
 
 initsc:	mov	#$c1,prcswl+1
@@ -2369,6 +2977,8 @@ initsc:	mov	#$c1,prcswl+1
 clrscr:	jsr	home
 	mov	wndtop,lincnt
 	rts
+
+	endif
 
 
 ; find the highest usable page of memory
@@ -2458,20 +3068,30 @@ outbuf:	ldy	#hdrflg+1
 
 ; output the buffer to the printer
 
+	if	iver>=iver2
 l1ba0:	fcb	$00			; printer initialization flag
+	endif
 
 prtbuf:	dpsh	cswl			; save our output vector
-	psh	cursrh			; and cursor column
+
+	if	iver>=iver3
+	psh	cursrh			; save cursor column
+	endif
 
 	dmov	prcswl,cswl		; get vector for printer
 
 	ldx	#$00			; start with position 0 in buffer
 
+	if	iver>=iver2
 	lda	l1ba0			; is printer initialized?
 	bne	l1bd5			; yes, go print it
 	inc	l1ba0			; no, but now will be
-
-	lda	#$89			; output ^I80N
+					; output ^I80N
+	if	iver<iver3
+	lda	#$09
+	else
+	lda	#$89
+	endif
 	jsr	cout			;   (this sets printer width to 80
 	lda	#$91			;    characters, thereby disabling
 	sta	prtflg			;    screen echo (we hope!))
@@ -2481,6 +3101,8 @@ prtbuf:	dpsh	cswl			; save our output vector
 	jsr	cout
 	lda	#$ce
 	jsr	cout
+
+	endif
 
 l1bd5:	cpxbe	chrptr,l1be3		; are we done yet?
 
@@ -2492,9 +3114,12 @@ l1bd5:	cpxbe	chrptr,l1be3		; are we done yet?
 
 l1be3:	dmov	cswl,prcswl		; save print vector again (may have changed)
 
+	if	iver>=iver3
 	pul	cursrh			; restore cursor column
-	dpul	cswl			; and display vector
-	rts				; and return
+	endif
+
+	dpul	cswl			; restore display vector
+	rts
 
 
 ; output the buffer to the display
@@ -2550,13 +3175,24 @@ l1c79:	ldx	#$00
 	jmp	l1b61
 
 
+	if	iver<=iver2
+s1cc9:	jsr	home
+	lda	wndtop
+	sta	lincnt
+	rts
+	endif
+
+
 scorms:	fcb	"SCORE:"
 scmsln	equ	*-scorms
 
+	if	iver>=iver3
 timems:	fcb	"TIME:"
 tmmsln	equ	*-timems
 
 l1c89:	fcb	$00
+	endif
+
 
 opprst:	jsr	outbuf			; print what's in the buffer
 	psh	cursrh,cursrv		; save the cursor position
@@ -2564,18 +3200,33 @@ opprst:	jsr	outbuf			; print what's in the buffer
 	jsr	vtab
 	mov	#$3f,invflg		; set inverse mode
 
+	if	iver<iver3
+	jsr	clreol
+	endif
+
 	lda	#$10			; get global var 0
 	jsr	gtvra1
+
+	if	iver>=iver3
 	lda	acc			; is it save as last time?
 	cmpbe	l1c89,l1cb8		; yes, don't print it
 	sta	l1c89			; no, save for next time's compare
-	jsr	l0de4			; output thing name
+	endif
+
+	jsr	prtnam			; output thing name
 	jsr	dspbuf			; send it to display
+
+	if	iver>=iver3
 	jsr	clreol			; clear rest of line
+	endif
 
 l1cb8:	mov	#$19,cursrh		; tab over
+
+	if	iver>=iver3
 	lda	stltyp			; score or time?
 	bne	l1cdb			; time
+	endif
+
 	dmovi	scorms,acc		; score, print "SCORE:"
 	ldx	#scmsln
 	jsr	shwmsg
@@ -2584,6 +3235,10 @@ l1cb8:	mov	#$19,cursrh		; tab over
 	jsr	gtvra1
 	jsr	prntnm			; output it as decimal number
 	lda	#'/'			; separator
+
+
+	if	iver>=iver3
+
 	bne	l1d05			; always taken
 
 l1cdb:	dmovi	timems,acc		; print "TIME:"
@@ -2602,11 +3257,19 @@ l1cf5:	cmpbm	#$0c,l1d00		; is it A.M. or P.M.?
 	sta	acc
 l1d00:	jsr	prntnm			; print out hours
 	lda	#':'
+
+	endif
+
+
 l1d05:	jsr	bfchar			; print the separator
 	lda	#$12			; get global var 2 (turns/minutes)
 	jsr	gtvra1
+
+	if	iver>=iver3
+
 	lda	stltyp			; time?
 	beq	l1d40			; no, go print turns
+
 	lda	acc			; yes, are minutes < 10?
 	cmpbg	#$0a,l1d1c		; no
 	lda	#$b0			; yes, print a space (?)
@@ -2626,9 +3289,15 @@ l1d35:	jsr	bfchar			; print the 'A' or 'P'
 	jsr	bfchar			; print the 'M'
 	jmp	l1d43
 
+	endif
+
 l1d40:	jsr	prntnm			; print the score
 l1d43:	jsr	dspbuf			; display the buffer
+
+	if	iver>=iver3
 	jsr	clreol			; clear out the line
+	endif
+
 	mov	#$ff,invflg		; back to normal video mode
 	pul	cursrv,cursrh		; and the old cursor loc
 	jsr	vtab
@@ -2681,6 +3350,18 @@ l1db1:	pla
 	rts
 
 
+	if	iver<iver3
+s1d90:	mov	#1,wndtop
+	mov	#0,wndlft
+	mov	#40,wndwdt
+	mov	#24,wndbot
+	mov	#'>',prompt
+	mov	#$ff,invflg
+	jsr	s1cc9			; jsr/rts could be combined to jmp
+	rts
+	endif
+
+
 iob:	fcb	$01			; IOB type
 iobslt:	fcb	$60			; Slot * 16
 iobdrv:	fcb	$01			; Drive
@@ -2713,21 +3394,68 @@ l1de7:	inc	iobtrk
 l1ded:	add	,secptk,iobsct
 	lda	#iob>>8
 	ldy	#iob&$ff
+
+	if	iver<iver3
+	jsr	rwts
+	rts
+	else
 	jmp	rwts
+	endif
+
 
 drdbuf:	dmovi	buffer,acc
 drdnxt:	dinc	acb
 drdblk:	lda	#$01
-	jmp	diskio
 
+	if	iver<iver3
+	jsr	diskio
+	rts
+	else
+	jmp	diskio
+	endif
+
+	
+	if	iver<iver3
+drdbkf	equ	drdblk
+	else
 drdbkf:	jsr	drdblk
 	jsrcs	fatal
 	rts
+	endif
+
 
 dwrbuf:	dmovi	buffer,acc
 dwrnxt:	dinc	acb
+
+	if	iver<iver3
+	lda	dct+2
+	pha
+	lda	dct+3
+	pha
+	lda	#$d8
+	sta	dct+3
+	lda	#$ef
+	sta	dct+2
+	endif
+
 	lda	#$02
+
+	if	iver<iver3
+	jsr	diskio
+	pla
+	sta	dct+3
+	pla
+	sta	dct+2
+	rts
+	else
 	jmp	diskio
+	endif
+
+
+	if	iver<iver3
+s1e36:	jsr	s1d90		; jsr/rts could be jmp,
+	rts			; but could just use jsr $1d90 instead of jsr s1e36
+	endif
 
 
 outmsg:	stx	acd
@@ -2740,37 +3468,146 @@ l1e2f:	ldy	acd+1
 	decbn	acd,l1e2f
 	rts
 
-l1e3d:	fcb	"PLEASE INSERT SAVE DISKETTE,"
 
-l1e59:	fcb	$00
+ismsg:	fcb	"PLEASE INSERT SAVE DISKETTE,"
+ismsgl	equ	*-ismsg
 
-l1e5a:	fcb	"SLOT     (1-7):"
-l1e69:	fcb	"618"
+	if	iver==iver1
 
-l1e6c:	fcb	"DRIVE    (1-2):"
-l1e7b:	fcb	"213"
+slmsg:	fcb	"    INTO  SLOT: "
+slmsgl	equ	*-slmsg
 
-l1e7e:	fcb	"POSITION (0-7):"
-l1e8d:	fcb	"008"
+sdmsg:	fcb	"DEFAULT = 6"
+sdmsgl	equ	*-sdmsg
 
-l1e90:	fcb	"DEFAULT = "
+drmsg:	fcb	"         DRIVE: "
+drmsgl	equ	*-drmsg
 
-l1e9a:	fcb	"--- PRESS 'RETURN' KEY TO BEGIN ---"
+ddmsg:	fcb	"DEFAULT = 1"
+ddmsgl	equ	*-ddmsg
 
+	else	; iver>=iver2
 
-l1ebd:	jsr	clrscr
+msgofs:	fcb	$00
+
+msgbas:
+
+slmsg:	fcb	"SLOT     (1-7):"
+slmsgl	equ	*-slmsg
+slmsgo	equ	slmsg-msgbas
+
+sldef:	fcb	"6"		; default
+	if	iver>=iver3
+	fcb	"18"		; range
+	endif
+
+drmsg:	fcb	"DRIVE    (1-2):"
+drmsgl	equ	*-drmsg
+drmsgo	equ	drmsg-msgbas
+
+	if	(drmsgl<>slmsgl)
+	error	"save/restore prompt message lengths must be identical"
+	endif
+
+drdef:	fcb	"2"		; default
+	if	iver>=iver3
+	fcb	"13"		; range
+	endif
+
+psmsg:	fcb	"POSITION (0-7):"
+psmsgl	equ	*-psmsg
+psmsgo	equ	psmsg-msgbas
+
+	if	psmsgl <> slmsgl
+	error	"save/restore prompt message lengths must be identical"
+	endif
+
+psdef:	fcb	"0"		; default
+	if	iver>=iver3
+	fcb	"08"		; range
+	endif
+
+dfmsg:	fcb	"DEFAULT = "
+dfmsgl	equ	*-dfmsg
+
+	endif
+
+prmsg:	fcb	"--- PRESS 'RETURN' KEY TO BEGIN ---"
+prmsgl	equ	*-prmsg
+
+l1ebd:
+	if	iver<iver3
+	jsr	s1cc9
+	else
+	jsr	clrscr
+	endif
+
 	jsr	prntbf
 	jsr	prntbf
-	dmovi	l1e3d,acc
-	ldx	#$1c
+	dmovi	ismsg,acc
+	ldx	#ismsgl
 	jsr	outmsg
-	jsr	prntbf
-	mov	#$24,l1e59
-	jsr	l1f4c
-	sta	l1e8d
+l1f0b:	jsr	prntbf
+	
+	if	iver>iver1
+
+l1ee1:	mov	#psmsgo,msgofs
+	jsr	getnum
+
+	if	iver<iver3
+	cmp	#'0'
+	blt	l1ee1
+	cmp	#'8'
+	bge	l1ee1
+	endif
+
+	sta	psdef
 	jsr	bfchar
-	mov	#$00,l1e59
-	jsr	l1f4c
+
+	endif
+
+l1ef7:
+	if	iver==iver1
+
+	dmovi	slmsg,acc
+	ldx	#slmsgl
+	jsr	outmsg
+	jsr	outbuf
+	mov	#25,cursrh
+	mov	#$3f,invflg
+	dmovi	sdmsg,acc
+	ldx	#sdmsgl
+	jsr	shwmsg
+	mov	#$ff,invflg
+	jsr	rdkey
+	pha
+	mov	#25,cursrh
+	jsr	clreol
+	pla
+	cmp	#crchar+$80
+	bne	l1f4c
+	lda	#'6'+$80
+	jmp	l1f54
+l1f4c:	cmp	#'1'+$80
+	blt	L1f0b
+	cmp	#'8'+$80
+	bge	L1f0b
+l1f54:
+
+	else
+
+	mov	#slmsgo,msgofs
+	jsr	getnum
+
+	if	iver<iver3
+	cmp	#'1'
+	blt	l1ef7
+	cmp	#'8'
+	bge	l1ef7
+	endif
+
+	endif
+
 	tax
 	and	#$07
 	rept	4
@@ -2778,47 +3615,111 @@ l1ebd:	jsr	clrscr
 	endm
 	sta	iobslt
 	txa
-	sta	l1e69
+	if	iver==iver1
+	and	#$7f
+	else
+	sta	sldef
+	endif
 	jsr	bfchar
-	mov	#$12,l1e59
-	jsr	l1f4c
-	tax
+
+; get drive number
+l1f18:
+	if	iver==iver1
+
+	jsr	prntbf
+	dmovi	drmsg,acc
+	ldx	#drmsgl
+	jsr	outmsg
+	jsr	outbuf
+	mov	#25,cursrh
+	mov	#$3f,invflg
+	dmovi	ddmsg,acc
+	ldx	#ddmsgl
+	jsr	shwmsg
+	mov	#$ff,invflg
+	jsr	rdkey
+	pha
+	mov	#25,cursrh
+	jsr	clreol
+	pla
+	cmp	#crchar+$80
+	bne	l1fa5
+	lda	#'1'+$80
+	jmp	l1fad
+l1fa5:	cmp	#'1'+$80
+	bcc	l1f18
+	cmp	#'3'+$80
+	bcs	l1f18
+
+	else
+
+	mov	#drmsgo,msgofs
+	jsr	getnum
+
+	if	iver<iver3
+	cmp	#'1'
+	bcc	l1f18
+	cmp	#'3'
+	bge	l1f18
+	endif
+
+	endif
+
+l1fad:	tax
 	and	#$03
 	sta	iobdrv
 	txa
-	sta	l1e7b
+	if	iver==iver1
+	and	#$7f
+	else
+	sta	drdef
+	endif
 	jsr	bfchar
+
 l1f12:	jsr	prntbf
-	dmovi	l1e9a,acc
-	ldx	#$23
+	dmovi	prmsg,acc
+	ldx	#prmsgl
 	jsr	outmsg
 	jsr	outbuf
 	jsr	rdkey
 	cmpbn	#crchar+$80,l1f12
+
+	if	iver>iver1
 	mov	#$ff,acb,acb+1
-	lda	l1e8d
+
+	lda	psdef
 	and	#$07
 	beq	l1f48
 	tay
 l1f3a:	daddb2	acb,#$40
 	dybne	l1f3a
-l1f48:	jsr	prntbf
+	endif
+
+l1f48:	jsr	prntbf		; jsr/rts could be jmp
+
+	if	iver==iver1
+	mov	#$ff,acb,acb+1
+	endif
+	
 	rts
 
+	if	iver>=iver2
 
-l1f4c:	jsr	prntbf
-	dmovi	l1e5a,acc
-	daddb2	acc,l1e59
-	ldx	#$0f
+getnum:	jsr	prntbf
+
+	dmovi	msgbas,acc
+	daddb2	acc,msgofs
+	ldx	#slmsgl
 	jsr	outmsg
 	jsr	outbuf
 	mov	#$19,cursrh
 	mov	#$3f,invflg
-	dmovi	l1e90,acc
-	ldx	#$0a
+
+	dmovi	dfmsg,acc
+	ldx	#dfmsgl
 	jsr	shwmsg
-	dmovi	l1e69,acc
-	daddb2	acc,l1e59
+	dmovi	sldef,acc
+	daddb2	acc,msgofs
 	ldx	#$01
 	jsr	shwmsg
 	mov	#$ff,invflg
@@ -2827,32 +3728,50 @@ l1f4c:	jsr	prntbf
 	mov	#$19,cursrh
 	jsr	clreol
 	pla
-	ldy	l1e59
+
+	if	iver>=iver3
+	ldy	msgofs
+	endif
+	
 	cmpbn	#crchar+$80,l1fb3
-	lda	l1e69,y
+
+	if	iver<iver3
+	ldy	msgofs
+	endif
+
+	lda	sldef,y
 l1fb3:	and	#$7f
-	cmp	l1e69+1,y
-	blt	l1f4c
-	cmp	l1e69+2,y
-	bge	l1f4c
+
+	if	iver>=iver3
+	cmp	sldef+1,y
+	blt	getnum
+	cmp	sldef+2,y
+	bge	getnum
+	endif
+
 	rts
 
+	endif
 
-l1fc0:	fcb	"PLEASE RE-INSERT GAME DISKETTE,"
 
-l1fdf:	fcb	"--- PRESS 'RETURN' KEY TO CONTINUE ---"
+rgmsg:	fcb	"PLEASE RE-INSERT GAME DISKETTE,"
+rgmsgl	equ	*-rgmsg
+
+pr2ms:	fcb	"--- PRESS 'RETURN' KEY TO CONTINUE ---"
+pr2msl	equ	*-pr2ms
 
 l2005:	lda	iobslt
 	cmpbn	#$60,l2040
 	lda	iobdrv
 	cmpbn	#$01,l2040
 	jsr	prntbf
-	dmovi	l1fc0,acc
-	ldx	#$1f
+	dmovi	rgmsg,acc
+	ldx	#rgmsgl
 	jsr	outmsg
+
 l2023:	jsr	prntbf
-	dmovi	l1fdf,acc
-	ldx	#$26
+	dmovi	pr2ms,acc
+	ldx	#pr2msl
 	jsr	outmsg
 	jsr	outbuf
 	jsr	rdkey
@@ -2865,6 +3784,16 @@ l2040:	mov	#$60,iobslt
 
 opsvgm:	jsr	l1ebd			; setup for disk I/O
 
+	if	iver<iver3
+
+	ldx	#$00
+	ldy	#hdrirl
+	lda	(frzmem),y
+	sta	buffer,x
+	inx
+
+	else
+
 	ldx	#$00			; copy game release # to buffer
 	ldy	#hdrrel
 	lda	(frzmem),y
@@ -2874,6 +3803,8 @@ opsvgm:	jsr	l1ebd			; setup for disk I/O
 	lda	(frzmem),y
 	sta	buffer,x
 	inx
+
+	endif
 
 	dmovi	prgidx,acc		; copy PC to buffer
 	ldy	#$03
@@ -2898,9 +3829,9 @@ opsvgm:	jsr	l1ebd			; setup for disk I/O
 	jsr	dwrbuf			; write it out
 	bcs	svgmfl			; fail if error
 
-	ldx	#$00			; copy high 192 bytes of stack
+	ldx	#$00			; copy rest bytes of stack
 	dmovi	stklim+$0100,acc	; to buffer
-	ldy	#$c0
+	ldy	#(stckmx*2)-$0100
 	jsr	svgmmv
 
 	jsr	dwrbuf			; write it out
@@ -2940,17 +3871,30 @@ oprsgm:	jsr	l1ebd			; setup for disk I/O
 	jsr	drdbuf			; read in a bufferful
 	jcs	rsgmfl			; fail if error
 
+	if	iver<iver3
+
+	ldx	#$00
+	ldy	#hdrirl
+	lda	(frzmem),y
+	cmp	buffer,x
+	jne	rsgmfl
+
+	else
+
 	ldx	#$00			; check release of game, fail if wrong
 	ldy	#hdrrel
 	lda	(frzmem),y
 	cmp	buffer,x
 	bne	l210a
 	inx
+
 	iny
 	lda	(frzmem),y
 	cmp	buffer,x
 	beq	l210d
 l210a:	jmp	rsgmfl
+
+	endif
 
 l210d:	ldy	#hdrflg+1		; preserve SCRIPT flag
 	lda	(frzmem),y
@@ -2981,9 +3925,9 @@ l210d:	ldy	#hdrflg+1		; preserve SCRIPT flag
 	jsr	drdbuf			; read a bufferful
 	bcs	rsgmfl			; fail if error
 
-	ldx	#$00			; restore last 192 bytes of stack
-	dmovi	stklim+$100,acc
-	ldy	#$c0
+	ldx	#$00			; restore rest of stack
+	dmovi	stklim+$0100,acc
+	ldy	#(stckmx*2)-$0100
 	jsr	rsgmmv
 
 	dmov	frzmem,acc		; figure out how many pages of
@@ -3016,17 +3960,79 @@ rsgmmv:	dey				; copy buffer to memory (read)
 	rts
 
 
-l21a0:	inc	rndloc			; get a 'random' number
+	if	iver>=iver3
+
+; a really awful PRNG
+
+getrnd:	inc	rndloc			; get a 'random' number
 	inc	rndloc+1
 	dmov	rndloc,acc
 	rts
 
+	endif
+
+
+	if	iver==iver1
+
+fatal:	fcb	$00
+
+	fcb	$00,$00,$00,$00,$00,$00,$00,$00		; unused?
+	fcb	$b6,$19,$00,$00,$02,$00,$01,$01
+	fcb	$85,$e4,$a9,$1e,$85,$e5,$a2
+
+; $21c5..$21ff is duplicate of $20c5..$20ff
+
+	fcb	$23,$20,$6c
+	fcb	$1e,$20,$36,$1c,$20,$0c,$fd,$c9
+	fcb	$8d,$d0,$e6,$20,$8d,$1c,$a9,$ff
+	fcb	$85,$e2,$85,$e3,$60,$50,$4c,$45
+	fcb	$41,$53,$45,$20,$52,$45,$2d,$49
+	fcb	$4e,$53,$45,$52,$54,$20,$47,$41
+	fcb	$4d,$45,$20,$44,$49,$53,$4b,$45
+	fcb	$54,$54,$45,$2c,$2d,$2d,$2d,$20
+
+	else
+
 endmsg:	fcb	"-- END OF SESSION --"
 enmsln	equ	*-endmsg
 
+
+	if	iver<iver3
+opends:	jsr	prntbf
+	dmovi	endmsg,acc
+	ldx	#enmsln
+	jsr	outmsg
+	jsr	prntbf
+	jmp	*			; halt
+	endif
+
+
+	if	iver<iver3
+ftlmsg:	fcb	"ZORK INTERNAL ERROR!"
+	else
 ftlmsg:	fcb	"INTERNAL ERROR #"
+	endif
 ftmsln	equ	*-ftlmsg
 
+
+	if	iver<iver3
+
+fatal:	fcb	$00			; brk instruction
+
+; a really awful PRNG
+getrnd:	rol	rndloc+1
+	lda	rndloc
+	sta	acc
+	lda	rndloc+1
+	sta	acc+1
+	rts
+
+	fillto	$21fc,$00
+	fcb	$fc,$19			; unused?
+
+	else
+
+opfatl:
 fatal:	jsr	prntbf			; flush anything left in buffer
 
 	dmovi	ftlmsg,acc		; output fatal message
@@ -3045,5 +4051,11 @@ opends:	jsr	prntbf			; flush anything left in buffer
 	jsr	prntbf			; flush the buffer
 
 halt:	jmp	halt			; die horribly
+
+	endif
+
+	endif
+
+	fillto	vmtorg,$00
 
 	end	start
