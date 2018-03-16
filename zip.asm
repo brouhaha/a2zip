@@ -8,25 +8,25 @@
 	cpu	6502
 
 
-iver1	equ	1	; interp for Z-machine release 1
-			; only known to be used by Zork I release 2 and 5
+iver1	equ	$0100	; interp for Z-machine version 1
+			; only known to be used by Zork I releases 2 and 5
 
-iver2	equ	2	; interp for Z-machine release 2
+iver2	equ	$0200	; interp for Z-machine version 2
 			; only known to be used by Zork I release 15
 			; and Zork II release 7
 
-; The following are all interpreter versions for Z-machine release 3
-iver3	equ	3
-iver3a	equ	4	; NOT YET SUPPORTED
-iver3b	equ	5	; NOT YET SUPPORTED
-iver3e	equ	8	; NOT YET SUPPORTED
-iver3h	equ	11	; NOT YET SUPPORTED
-iver3k	equ	14	; NOT YET SUPPORTED
-iver3m	equ	16	; NOT YET SUPPORTED
+; The following are interpreter revisions for Z-machine version 3
+iver3	equ	$0300
+iver3a	equ	$0301	; NOT YET SUPPORTED
+iver3b	equ	$0302
+iver3e	equ	$0305	; NOT YET SUPPORTED
+iver3h	equ	$0308	; NOT YET SUPPORTED
+iver3k	equ	$030b	; NOT YET SUPPORTED
+iver3m	equ	$030d	; NOT YET SUPPORTED
 
 
 	ifndef	iver
-iver	equ	iver3
+iver	equ	iver3b
 	endif
 
 
@@ -56,17 +56,24 @@ stckmx	equ	224			; maximum size of stack in words
 stcklc	equ	$03e8			; base address of stack (works down)
 stklim	equ	stcklc-2*stckmx		; lower limit of stack
 
-prtflg	equ	$0779			; printer flags
-
 mainor	equ	$0800			; origin of main program
-vmtorg	equ	mainor+$1a00		; origin of virtual memory tables
-vmtend	equ	vmtorg+$0200
-
-rwtsor	equ	vmtend			; origin of RWTS routines
+	
+rwtsor	equ	$2400			; origin of RWTS routines
 rwts	equ	rwtsor+$0500		; entry point of RWTS routines
 rwtsen	equ	rwtsor+rwtssz
 
+	if	iver<iver3b
+vmtorg	equ	mainor+$1a00		; origin of virtual memory tables
+	else
+vmtorg	equ	rwtsen			; origin of virtual memory tables
+	endif
+vmtend	equ	vmtorg+$0200
+
+	if	iver<iver3b
 firflc	equ	rwtsen			; first location available
+	else
+firflc	equ	vmtend
+	endif
 lstflc	equ	$c000-1			; last potential location available
 
 vmt1lc	equ	vmtorg+$0000		; virtual memory page tables
@@ -103,7 +110,30 @@ cswl	equ	$36			; character output vector
 rndloc	equ	$4e			; location randomized by keyboard input
 
 
-; Apple monitor rotuines
+; Apple firmware's screen hole locations
+
+cur80h	equ	$057b			; (slot 3) cursor h for 80 column
+
+prtflg	equ	$0779			; (slot 1) printer flags
+
+
+; Apple hardware locations
+
+rdc3rom	equ	$c017			; IIe and later: bit 7 set if
+					; slot 3 ROM ($c3xx) enabled
+
+
+; Apple peripheral card firmware
+
+sl3fw	equ	$c300
+
+
+; Apple ROM id location
+
+romid	equ	$fbb3
+
+
+; Apple monitor routines
 
 vtab	equ	$fc22			; adjust video pointer after cursor move
 home	equ	$fc58			; clear screen window
@@ -341,6 +371,12 @@ l0897:	add	,#$01
 l08b6:	ldy	#hdrtyp
 	lda	(frzmem),y
 
+	if	iver==iver3b
+	ora	#$20
+	sta	(frzmem),y
+	lda	(frzmem),y
+	endif
+
 	if	iver<iver3
 	and	#$01
 	eor	#$01
@@ -508,10 +544,25 @@ optab4:	fdb	opcall			; call procedure
 	fdb	oprndm			; generate random number
 	fdb	oppush			; push ARG1 to stack
 	fdb	oppull			; pull var from stack
+	if	iver>=iver3b
+	fdb	x_opsplw		; split widnow
+	fdb	x_opsetw		; set window
+	endif
 opmax4	equ	(*-optab4)/2
 
 
 mnloop:
+	if	iver>=iver3b
+	lda	d2004
+	bne	l09a9
+	ldy	#hdrflg+1
+	lda	(frzmem),y
+	and	#$01
+	beq	l09a9
+	jsr	s2067
+l09a9:
+	endif
+
 	if	iver<iver3
 	mov	prgidx,prgids
 	dmov	prglpg,prglps
@@ -948,7 +999,27 @@ opcrlf:
 
 	if	iver>=iver3
 
-opcksm:	ldy	#hdrcka+1		; get checksum end log. address (word
+	if	iver==iver3b
+ivmsg:	fcb	"INTERPRETER VERSION : B"
+	fcb	crchar,$ff
+	endif
+
+opcksm:
+	if	iver>=iver3b
+; message output loop clearly added by someone unfamiliar with codebase
+	dmovi	ivmsg,acc
+	ldy	#$00
+l0cb9:	lda	(acc),y
+	cmp	#$ff
+	beq	l0cc8
+	eor	#$80
+	jsr	cout
+	iny
+	jmp	l0cb9
+l0cc8:
+	endif
+
+	ldy	#hdrcka+1		; get checksum end log. address (word
 	lda	(frzmem),y		;   index)
 	sta	arg2
 	dey
@@ -1505,6 +1576,17 @@ oppsbi:	clc
 	adc	arg1+1
 	sta	acc+1
 	jmp	oppsb2
+	endif
+
+
+	if	iver>=iver3b
+; these jumps are ridiculous; opcode jump table could jump directly
+; to opsetw and opsplw
+x_opsetw:
+	jmp	opsetw
+
+x_opsplw:
+	jmp	opsplw
 	endif
 
 
@@ -2577,7 +2659,7 @@ doasci:	jsr	getnyb
 	ora	acd
 
 	if	iver==iver1
-	cmp	#$09		; tab
+	cmp	#tbchar
 	bne	l18dc
 	lda	#' '
 	endif
@@ -2834,7 +2916,7 @@ l1a91:	lda	acb
 	sta	acb
 	txa
 	
-	elseif	iver==iver3
+	elseif	iver>=iver3
 	
 	lda	acd
 	jsr	tstchr
@@ -2960,9 +3042,9 @@ opends:	jsr	prntbf
 	endif
 
 
-	if	iver>=iver3
-
 ; init output routine and screen window
+
+	if	iver==iver3
 
 initsc:	mov	#$c1,prcswl+1
 	mov	#$01,wndtop
@@ -2972,13 +3054,106 @@ initsc:	mov	#$c1,prcswl+1
 	mov	#$be,prompt
 	mov	#$ff,invflg
 
+	elseif	iver==iver3b
+
+s1b49:	sta	wndtop
+	sta	wndtop
+	rts
+
+initsc:	mov	#$c1,prcswl+1
+	lda	#$00
+	jsr	s1b49
+	lda	d2005
+	beq	lx1b61
+	lda	#$15
+	jsr	cout
+lx1b61:	mov	#$00,d2005,wndlft,l1ba0
+	mov	#$18,wndbot
+	mov	#$be,prompt
+	mov	#$ff,invflg
+	jsr	ck80c
+	mov	#$03,lincnt
+	lda	#$01
+	jsr	s1b49		; jsr/rts could be jmp
+	rts
+
+d1b84:	fcb	$00
+d1b85:	fcb	$00
+
+s1b86:	lda	d2005
+	beq	l1b90
+	lda	#crchar
+	jmp	l1b92
+l1b90:	lda	#crchar+$80
+l1b92:	jsr	cout
+	rts
+
+
+; split window
+opsplw:	lda	arg1
+	beq	l1bc3
+	pha
+	add	,#$01,wndbot
+	sta	d1b85
+	jsr	home
+	jsr	s1b86
+	mov	#24,wndbot
+	pla
+	add	,#$01
+	jsr	s1b49
+	mov	#1,cursrh,cur80h
+	mov	#22,cursrv
+	jsr	s1b86			; jsr/rts could be jmp
+	rts
+
+l1bc3:	lda	#$01
+	jsr	s1b49
+	mov	#$00,lincnt
+	sta	d1b85
+l1bcf:	rts
+	
+
+; set window
+opsetw:	lda	arg1
+	pha
+	bne	l1be9
+	mov	#$00,d1b84
+	mov	#1,cursrh,cur80h
+	mov	#22,cursrv
+	pla
+	jmp	l1bfc
+
+l1be9:	pla
+	cmp	#$01
+	bne	l1bcf
+	mov	#$01,d1b84
+	mov	#$00,cursrh,cur80h,cursrv
+l1bfc:	jsr	s1b86				; jsr/rts could be jmp
+	rts
+
+	endif
+
+
+	if	iver==iver3
+
 ; clear the screen
 
 clrscr:	jsr	home
 	mov	wndtop,lincnt
 	rts
 
+	elseif	iver==iver3b
+	
+clrscr:	jsr	home
+	lda	d1b85
+	bne	l1c0d
+	lda	#$01
+	jsr	s1b49
+l1c0d:	mov	#1,lincnt
+	rts
+
 	endif
+
 
 
 ; find the highest usable page of memory
@@ -3002,6 +3177,9 @@ l1b28:	dec	acc+1
 ; buffer a character for output
 
 bfchar:	ldx	chrptr			; get buffer pointer
+	if	iver>=iver3b
+	ldy	d2005
+	endif
 
 	cmpje	#crchar,prntbf	; if char is a CR, flush buffer
 	cmpbl	#' ',l1b61		; if it is a control character, discard it
@@ -3013,6 +3191,11 @@ bfchar:	ldx	chrptr			; get buffer pointer
 	else
 	cmp	#$80			; is it in LC range ($60 <= char < $80)?
 	bge	l1b57			;   (entirely superfluous test!)
+	endif
+
+	if	iver>=iver3b
+	cpy	#$01
+	beq	l1b57
 	endif
 
 	sub	,#$20			;   yes, convert o upper case
@@ -3088,19 +3271,39 @@ prtbuf:	dpsh	cswl			; save our output vector
 	inc	l1ba0			; no, but now will be
 					; output ^I80N
 	if	iver<iver3
-	lda	#$09
+	lda	#tbchar
 	else
-	lda	#$89
+	lda	#tbchar+$80
 	endif
 	jsr	cout			;   (this sets printer width to 80
-	lda	#$91			;    characters, thereby disabling
-	sta	prtflg			;    screen echo (we hope!))
+					;    characters, thereby disabling
+					;    screen echo (we hope!))
+	if	iver>=iver3b
+	txa
+	tay
+	sub	prcswl+1,#$c1
+	tax
+	lda	#$91
+	sta	prtflg,x
+
+	else
+
+	lda	#$91
+	sta	prtflg
+
+	endif
+
 	lda	#$b8
 	jsr	cout
 	lda	#$b0
 	jsr	cout
 	lda	#$ce
 	jsr	cout
+
+	if	iver>=iver3b
+	tya
+	tax
+	endif
 
 	endif
 
@@ -3116,6 +3319,9 @@ l1be3:	dmov	cswl,prcswl		; save print vector again (may have changed)
 
 	if	iver>=iver3
 	pul	cursrh			; restore cursor column
+	if	iver>=iver3b
+	sta	cur80h
+	endif
 	endif
 
 	dpul	cswl			; restore display vector
@@ -3128,8 +3334,12 @@ dspbuf:	ldx	#$00			; start with position 0 in buffer
 
 l1bf7:	cpxbe	chrptr,l1c05		; are we done yet?
 
-	lda	buffer,x		; get the character
-	jsr	cout1			; and output it
+	lda	buffer,x		; get the character and output it
+	if	iver<iver3b
+	jsr	cout1
+	else
+	jsr	cout
+	endif
 
 	inx				; increment pointer
 	jmp	l1bf7			; and go for another one
@@ -3142,7 +3352,16 @@ l1c05:	ldx	#$00			; reset pointer to beginning
 morems:	fcb	"[MORE]"
 mrmsln	equ	*-morems
 
-prntbf:	inc	lincnt
+prntbf:
+	if	iver<iver3b
+	inc	lincnt
+	else
+	lda	d1b84
+	bne	l1d1f
+	inc	lincnt
+l1d1f:
+	endif
+
 	lda	lincnt
 	cmpbl	wndbot,l1c40
 	dmovi	morems,acc
@@ -3151,7 +3370,13 @@ prntbf:	inc	lincnt
 	jsr	shwmsg
 	mov	#$ff,invflg
 	jsr	rdkey
+
+	if	iver<iver3b
 	sub	cursrh,#$06,cursrh
+	else
+	mov	#$00,cursrh,cur80h
+	endif
+
 	jsr	clreol
 	mov	wndtop,lincnt
 	inc	lincnt
@@ -3160,7 +3385,11 @@ l1c40:	psh	chrptr
 	pla
 	cmpbe	wndwdt,l1c50
 	lda	#crchar+$80
+	if	iver<iver3b
 	jsr	cout1
+	else
+	jsr	cout
+	endif
 l1c50:	ldy	#hdrflg+1
 	lda	(frzmem),y
 	and	#$01
@@ -3184,19 +3413,41 @@ s1cc9:	jsr	home
 
 
 scorms:	fcb	"SCORE:"
+	if	iver>=iver3b
+	fcb	" "
+	endif
 scmsln	equ	*-scorms
 
 	if	iver>=iver3
 timems:	fcb	"TIME:"
+	if	iver>=iver3b
+	fcb	" "
+	endif
 tmmsln	equ	*-timems
 
 l1c89:	fcb	$00
 	endif
 
 
-opprst:	jsr	outbuf			; print what's in the buffer
-	psh	cursrh,cursrv		; save the cursor position
-	mov	#$00,cursrh,cursrv	; home the cursor
+opprst:
+	jsr	outbuf			; print what's in the buffer
+
+	if	iver>=iver3b
+	ldy	d2005
+	cpy	#0
+	beq	l1daa
+	lda	cur80h
+	pha
+	jmp	l1dad
+	endif
+
+l1daa:	psh	cursrh			; save the cursor position
+l1dad:	psh	cursrv
+	mov	#$00,cursrh		; home the cursor
+	if	iver>=iver3b
+	sta	cur80h
+	endif
+	sta	cursrv
 	jsr	vtab
 	mov	#$3f,invflg		; set inverse mode
 
@@ -3209,7 +3460,9 @@ opprst:	jsr	outbuf			; print what's in the buffer
 
 	if	iver>=iver3
 	lda	acc			; is it save as last time?
+	if	iver==iver3
 	cmpbe	l1c89,l1cb8		; yes, don't print it
+	endif
 	sta	l1c89			; no, save for next time's compare
 	endif
 
@@ -3220,7 +3473,17 @@ opprst:	jsr	outbuf			; print what's in the buffer
 	jsr	clreol			; clear rest of line
 	endif
 
+	if	iver>=iver3b
+	lda	d2005
+	beq	l1cb8
+	lda	#60
+	sta	cursrh
+	sta	cur80h
+	jmp	l1de6
+	endif
+
 l1cb8:	mov	#$19,cursrh		; tab over
+l1de6:
 
 	if	iver>=iver3
 	lda	stltyp			; score or time?
@@ -3230,7 +3493,9 @@ l1cb8:	mov	#$19,cursrh		; tab over
 	dmovi	scorms,acc		; score, print "SCORE:"
 	ldx	#scmsln
 	jsr	shwmsg
+	if	iver<iver3b
 	inc	cursrh			; one space
+	endif
 	lda	#$11			; get global var 1 (score)
 	jsr	gtvra1
 	jsr	prntnm			; output it as decimal number
@@ -3244,7 +3509,9 @@ l1cb8:	mov	#$19,cursrh		; tab over
 l1cdb:	dmovi	timems,acc		; print "TIME:"
 	ldx	#tmmsln
 	jsr	shwmsg
+	if	iver<iver3b
 	inc	cursrh			; one space
+	endif
 	lda	#$11			; get global var 1 (time)
 	jsr	gtvra1
 	lda	acc			; is it zero?
@@ -3300,13 +3567,20 @@ l1d43:	jsr	dspbuf			; display the buffer
 
 	mov	#$ff,invflg		; back to normal video mode
 	pul	cursrv,cursrh		; and the old cursor loc
+	if	iver>=iver3b
+	sta	cur80h
+	endif
 	jsr	vtab
 	rts				; return to caller
 
 shwmsg:	ldy	#$00
 l1d59:	lda	(acc),y
 	ora	#$80
+	if	iver<iver3b
 	jsr	cout1
+	else
+	jsr	cout
+	endif
 	iny
 	dxbne	l1d59
 	rts
@@ -3469,7 +3743,11 @@ l1e2f:	ldy	acd+1
 	rts
 
 
-ismsg:	fcb	"PLEASE INSERT SAVE DISKETTE,"
+ismsg:
+	if	iver<iver3b
+	fcb	"PLEASE "
+	endif
+	fcb	"INSERT SAVE DISKETTE,"
 ismsgl	equ	*-ismsg
 
 	if	iver==iver1
@@ -3527,13 +3805,103 @@ psdef:	fcb	"0"		; default
 	fcb	"08"		; range
 	endif
 
+	if	iver>=iver3b
+c8msg:	fcb	"80 COLUMNS? (Y/N):"
+	fcb	crchar,$ff
+	endif
+
 dfmsg:	fcb	"DEFAULT = "
 dfmsgl	equ	*-dfmsg
 
 	endif
 
-prmsg:	fcb	"--- PRESS 'RETURN' KEY TO BEGIN ---"
+prmsg:	fcb	"--- PRESS 'RETURN' "
+	if	iver<iver3b
+	fcb	"KEY "
+	endif
+	fcb	"TO BEGIN ---"
 prmsgl	equ	*-prmsg
+
+	if	iver>=iver3b
+ptmsg:	fcb	"PRINTER SLOT (0-7):"
+	fcb	crchar
+d2003:	fcb	$ff
+d2004:	fcb	$00
+d2005:	fcb	$00
+	endif
+
+	if	iver>=iver3b
+
+ck80c:	lda	romid
+	cmp	#$06
+	bne	l2061
+	lda	rdc3rom
+	and	#$80
+	bne	l2061
+	mov	#$00,d2005
+l2019:	dmovi	c8msg,acc
+	jsr	home
+
+; Another dumb string output routine. Sigh.
+	ldy	#$00
+l2026:	lda	(acc),y
+	cmp	#$ff
+	beq	l2035
+	eor	#$80
+	jsr	cout
+	iny
+	jmp	l2026
+
+l2035:	jsr	rdkey
+	tax
+	cpx	#'n'+$80
+	beq	l2061
+	cpx	#'N'+$80
+	beq	l2061
+	cpx	#'y'+$80
+	beq	l204d
+	cpx	#'Y'+$80
+	beq	l204d
+	cpx	#crchar+$80
+	bne	l2019
+
+l204d:	jsr	home
+	dmovi	sl3fw,cswl
+	jsr	s1b86
+	mov	#$01,d2005
+	rts
+
+l2061:	mov	#$00,d2005
+	rts
+
+
+s2067:	lda	d2004
+	bne	l209a
+l206c:	dmovi	ptmsg,acc
+
+; yet another dumb inline string print
+; after the first ZIP v3, Infocom must have been overrun by newbies!
+	ldy	#$00
+l2076:	lda	(acc),y
+	cmp	#$ff
+	beq	l2085
+	eor	#$80
+	jsr	cout
+	iny
+	jmp	l2076
+
+l2085:	jsr	rdkey
+	sub	,#'0'+$80
+	blt	l206c
+	clc			; unnecessary
+	cmp	#8
+	bge	l206c
+	add	,#$c0,prcswl+1
+	inc	$2004
+l209a:	rts
+
+	endif
+
 
 l1ebd:
 	if	iver<iver3
@@ -3712,7 +4080,10 @@ getnum:	jsr	prntbf
 	ldx	#slmsgl
 	jsr	outmsg
 	jsr	outbuf
-	mov	#$19,cursrh
+	mov	#25,cursrh
+	if	iver>=iver3b
+	sta	cur80h
+	endif
 	mov	#$3f,invflg
 
 	dmovi	dfmsg,acc
@@ -3726,6 +4097,9 @@ getnum:	jsr	prntbf
 	jsr	rdkey
 	pha
 	mov	#$19,cursrh
+	if	iver>=iver3b
+	sta	cur80h
+	endif
 	jsr	clreol
 	pla
 
@@ -3754,10 +4128,18 @@ l1fb3:	and	#$7f
 	endif
 
 
-rgmsg:	fcb	"PLEASE RE-INSERT GAME DISKETTE,"
+rgmsg:
+	if	iver<iver3b
+	fcb	"PLEASE "
+	endif
+	fcb	"RE-INSERT GAME DISKETTE,"
 rgmsgl	equ	*-rgmsg
 
-pr2ms:	fcb	"--- PRESS 'RETURN' KEY TO CONTINUE ---"
+pr2ms:	fcb	"--- PRESS 'RETURN' "
+	if	iver<iver3b
+	fcb	"KEY "
+	endif
+	fcb	"TO CONTINUE ---"
 pr2msl	equ	*-pr2ms
 
 l2005:	lda	iobslt
@@ -4042,6 +4424,12 @@ fatal:	jsr	prntbf			; flush anything left in buffer
 	dpul2	acc			; output address where error detected
 	jsr	prntnm
 
+	if	iver>=iver3b
+	jmp	opends
+	fcb	$00,$00,$00,$00,$00,$00,$00,$00
+	fcb	$00,$00
+	endif
+
 opends:	jsr	prntbf			; flush anything left in buffer
 
 	dmovi	endmsg,acc		; output end of session message
@@ -4051,6 +4439,14 @@ opends:	jsr	prntbf			; flush anything left in buffer
 	jsr	prntbf			; flush the buffer
 
 halt:	jmp	halt			; die horribly
+
+	if	iver==iver3b
+	; junk
+	fcb	$00,$00,$00,$00,$00,$00,$00,$00
+	fcb	$ee,$1b,$00,$00,$02,$00,$01,$01
+	fcb	$e7,$a2,$18,$20,$52,$1f,$20,$18
+	fcb	$1d,$a9
+	endif
 
 	endif
 

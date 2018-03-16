@@ -32,7 +32,16 @@ ZIP version 3. The earliest version 3 interpreter, like the version 1 and
 version 2 interpreters, did not have any more specific interpreter revision
 identification. Later version 3 interpreter revisions for the Apple II
 had a revision letter, with revisions A, B, E, H, K, and M known to exist.
-None of the lettered revisions are currently represented here yes.
+Of the lettered revisions, only B is currently represented here.
+
+Version 3 revision A added support for the Apple IIe 80-column text mode, with upper
+and lower case display, and allowed the user to select a slot number for the
+printer interface card, which previously was required to be slot 1.
+
+Version 3 revision B added support for splitting the screen into two windows.
+
+Changes introduced in later revisions of the version 3 interpreter have not
+yet been analyzed.
 
 Eventually game images exceeded the 128KiB limit of ZIP version 3, therefore
 necessitating new ZIP versions 4, 5, and 6, also known as EZIP, XZIP, and YZIP,
