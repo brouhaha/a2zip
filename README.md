@@ -32,7 +32,7 @@ ZIP version 3. The earliest version 3 interpreter, like the version 1 and
 version 2 interpreters, did not have any more specific interpreter revision
 identification. Later version 3 interpreter revisions for the Apple II
 had a revision letter, with revisions A, B, E, H, K, and M known to exist.
-Of the lettered revisions, only B is currently represented here.
+Of the lettered revisions, only A and B are currently represented here.
 
 Version 3 revision A added support for the Apple IIe 80-column text mode, with upper
 and lower case display, and allowed the user to select a slot number for the

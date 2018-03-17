@@ -17,7 +17,7 @@ iver2	equ	$0200	; interp for Z-machine version 2
 
 ; The following are interpreter revisions for Z-machine version 3
 iver3	equ	$0300
-iver3a	equ	$0301	; NOT YET SUPPORTED
+iver3a	equ	$0301
 iver3b	equ	$0302
 iver3e	equ	$0305	; NOT YET SUPPORTED
 iver3h	equ	$0308	; NOT YET SUPPORTED
@@ -62,14 +62,14 @@ rwtsor	equ	$2400			; origin of RWTS routines
 rwts	equ	rwtsor+$0500		; entry point of RWTS routines
 rwtsen	equ	rwtsor+rwtssz
 
-	if	iver<iver3b
+	if	iver<iver3a
 vmtorg	equ	mainor+$1a00		; origin of virtual memory tables
 	else
 vmtorg	equ	rwtsen			; origin of virtual memory tables
 	endif
 vmtend	equ	vmtorg+$0200
 
-	if	iver<iver3b
+	if	iver<iver3a
 firflc	equ	rwtsen			; first location available
 	else
 firflc	equ	vmtend
@@ -371,8 +371,8 @@ l0897:	add	,#$01
 l08b6:	ldy	#hdrtyp
 	lda	(frzmem),y
 
-	if	iver==iver3b
-	ora	#$20
+	if	iver>=iver3b
+	ora	#$20			; signal game that windows are available
 	sta	(frzmem),y
 	lda	(frzmem),y
 	endif
@@ -552,7 +552,7 @@ opmax4	equ	(*-optab4)/2
 
 
 mnloop:
-	if	iver>=iver3b
+	if	iver>=iver3a
 	lda	d2004
 	bne	l09a9
 	ldy	#hdrflg+1
@@ -999,13 +999,14 @@ opcrlf:
 
 	if	iver>=iver3
 
-	if	iver==iver3b
-ivmsg:	fcb	"INTERPRETER VERSION : B"
+	if	iver>iver3
+ivmsg:	fcb	"INTERPRETER VERSION : "
+	fcb	'@' + (iver & $ff)
 	fcb	crchar,$ff
 	endif
 
 opcksm:
-	if	iver>=iver3b
+	if	iver>=iver3a
 ; message output loop clearly added by someone unfamiliar with codebase
 	dmovi	ivmsg,acc
 	ldy	#$00
@@ -3054,28 +3055,54 @@ initsc:	mov	#$c1,prcswl+1
 	mov	#$be,prompt
 	mov	#$ff,invflg
 
-	elseif	iver==iver3b
+	endif
+	
+
+	if	iver>=iver3b
 
 s1b49:	sta	wndtop
 	sta	wndtop
 	rts
 
+	endif
+
+
+	if	iver>=iver3a
+
 initsc:	mov	#$c1,prcswl+1
 	lda	#$00
+	if	iver>=iver3b
 	jsr	s1b49
+	else
+	sta	wndtop
+	endif
 	lda	d2005
 	beq	lx1b61
 	lda	#$15
 	jsr	cout
-lx1b61:	mov	#$00,d2005,wndlft,l1ba0
+lx1b61:	mov	#$00,d2005
+	if	iver==iver3a
+	lda	#$00
+	endif
+	sta	wndlft
+	sta	l1ba0
 	mov	#$18,wndbot
 	mov	#$be,prompt
 	mov	#$ff,invflg
 	jsr	ck80c
 	mov	#$03,lincnt
 	lda	#$01
-	jsr	s1b49		; jsr/rts could be jmp
+	if	iver>=iver3b
+	jsr	s1b49
+	else
+	sta	wndtop
+	endif
 	rts
+
+	endif
+
+
+	if	iver>=iver3b
 
 d1b84:	fcb	$00
 d1b85:	fcb	$00
@@ -3100,7 +3127,11 @@ opsplw:	lda	arg1
 	mov	#24,wndbot
 	pla
 	add	,#$01
+	if	iver>=iver3b
 	jsr	s1b49
+	else
+	sta	wndtop
+	endif
 	mov	#1,cursrh,cur80h
 	mov	#22,cursrv
 	jsr	s1b86			; jsr/rts could be jmp
@@ -3142,7 +3173,13 @@ clrscr:	jsr	home
 	mov	wndtop,lincnt
 	rts
 
-	elseif	iver==iver3b
+	elseif	iver==iver3a
+
+clrscr:	jsr	home
+	mov	#$01,wndtop,wndtop,lincnt
+	rts
+
+	elseif	iver>=iver3b
 	
 clrscr:	jsr	home
 	lda	d1b85
@@ -3177,7 +3214,7 @@ l1b28:	dec	acc+1
 ; buffer a character for output
 
 bfchar:	ldx	chrptr			; get buffer pointer
-	if	iver>=iver3b
+	if	iver>=iver3a
 	ldy	d2005
 	endif
 
@@ -3193,7 +3230,7 @@ bfchar:	ldx	chrptr			; get buffer pointer
 	bge	l1b57			;   (entirely superfluous test!)
 	endif
 
-	if	iver>=iver3b
+	if	iver>=iver3a
 	cpy	#$01
 	beq	l1b57
 	endif
@@ -3278,7 +3315,7 @@ prtbuf:	dpsh	cswl			; save our output vector
 	jsr	cout			;   (this sets printer width to 80
 					;    characters, thereby disabling
 					;    screen echo (we hope!))
-	if	iver>=iver3b
+	if	iver>=iver3a
 	txa
 	tay
 	sub	prcswl+1,#$c1
@@ -3300,7 +3337,7 @@ prtbuf:	dpsh	cswl			; save our output vector
 	lda	#$ce
 	jsr	cout
 
-	if	iver>=iver3b
+	if	iver>=iver3a
 	tya
 	tax
 	endif
@@ -3319,7 +3356,7 @@ l1be3:	dmov	cswl,prcswl		; save print vector again (may have changed)
 
 	if	iver>=iver3
 	pul	cursrh			; restore cursor column
-	if	iver>=iver3b
+	if	iver>=iver3a
 	sta	cur80h
 	endif
 	endif
@@ -3335,7 +3372,7 @@ dspbuf:	ldx	#$00			; start with position 0 in buffer
 l1bf7:	cpxbe	chrptr,l1c05		; are we done yet?
 
 	lda	buffer,x		; get the character and output it
-	if	iver<iver3b
+	if	iver<iver3a
 	jsr	cout1
 	else
 	jsr	cout
@@ -3371,7 +3408,7 @@ l1d1f:
 	mov	#$ff,invflg
 	jsr	rdkey
 
-	if	iver<iver3b
+	if	iver<iver3a
 	sub	cursrh,#$06,cursrh
 	else
 	mov	#$00,cursrh,cur80h
@@ -3385,7 +3422,7 @@ l1c40:	psh	chrptr
 	pla
 	cmpbe	wndwdt,l1c50
 	lda	#crchar+$80
-	if	iver<iver3b
+	if	iver<iver3a
 	jsr	cout1
 	else
 	jsr	cout
@@ -3413,14 +3450,14 @@ s1cc9:	jsr	home
 
 
 scorms:	fcb	"SCORE:"
-	if	iver>=iver3b
+	if	iver>=iver3a
 	fcb	" "
 	endif
 scmsln	equ	*-scorms
 
 	if	iver>=iver3
 timems:	fcb	"TIME:"
-	if	iver>=iver3b
+	if	iver>=iver3a
 	fcb	" "
 	endif
 tmmsln	equ	*-timems
@@ -3432,7 +3469,7 @@ l1c89:	fcb	$00
 opprst:
 	jsr	outbuf			; print what's in the buffer
 
-	if	iver>=iver3b
+	if	iver>=iver3a
 	ldy	d2005
 	cpy	#0
 	beq	l1daa
@@ -3444,7 +3481,7 @@ opprst:
 l1daa:	psh	cursrh			; save the cursor position
 l1dad:	psh	cursrv
 	mov	#$00,cursrh		; home the cursor
-	if	iver>=iver3b
+	if	iver>=iver3a
 	sta	cur80h
 	endif
 	sta	cursrv
@@ -3473,7 +3510,7 @@ l1dad:	psh	cursrv
 	jsr	clreol			; clear rest of line
 	endif
 
-	if	iver>=iver3b
+	if	iver>=iver3a
 	lda	d2005
 	beq	l1cb8
 	lda	#60
@@ -3493,7 +3530,7 @@ l1de6:
 	dmovi	scorms,acc		; score, print "SCORE:"
 	ldx	#scmsln
 	jsr	shwmsg
-	if	iver<iver3b
+	if	iver<iver3a
 	inc	cursrh			; one space
 	endif
 	lda	#$11			; get global var 1 (score)
@@ -3509,7 +3546,7 @@ l1de6:
 l1cdb:	dmovi	timems,acc		; print "TIME:"
 	ldx	#tmmsln
 	jsr	shwmsg
-	if	iver<iver3b
+	if	iver<iver3a
 	inc	cursrh			; one space
 	endif
 	lda	#$11			; get global var 1 (time)
@@ -3567,7 +3604,7 @@ l1d43:	jsr	dspbuf			; display the buffer
 
 	mov	#$ff,invflg		; back to normal video mode
 	pul	cursrv,cursrh		; and the old cursor loc
-	if	iver>=iver3b
+	if	iver>=iver3a
 	sta	cur80h
 	endif
 	jsr	vtab
@@ -3576,7 +3613,7 @@ l1d43:	jsr	dspbuf			; display the buffer
 shwmsg:	ldy	#$00
 l1d59:	lda	(acc),y
 	ora	#$80
-	if	iver<iver3b
+	if	iver<iver3a
 	jsr	cout1
 	else
 	jsr	cout
@@ -3805,8 +3842,12 @@ psdef:	fcb	"0"		; default
 	fcb	"08"		; range
 	endif
 
-	if	iver>=iver3b
-c8msg:	fcb	"80 COLUMNS? (Y/N):"
+	if	iver>=iver3a
+c8msg:
+	if	iver==iver3a
+	fcb	"DO YOU WANT "
+	endif
+	fcb	"80 COLUMNS? (Y/N):"
 	fcb	crchar,$ff
 	endif
 
@@ -3822,15 +3863,19 @@ prmsg:	fcb	"--- PRESS 'RETURN' "
 	fcb	"TO BEGIN ---"
 prmsgl	equ	*-prmsg
 
-	if	iver>=iver3b
-ptmsg:	fcb	"PRINTER SLOT (0-7):"
+	if	iver>=iver3a
+ptmsg:	fcb	"PRINTER SLOT "
+	if	iver==iver3a
+	fcb	"NUMBER? "
+	endif
+	fcb	"(0-7):"
 	fcb	crchar
 d2003:	fcb	$ff
 d2004:	fcb	$00
 d2005:	fcb	$00
 	endif
 
-	if	iver>=iver3b
+	if	iver>=iver3a
 
 ck80c:	lda	romid
 	cmp	#$06
@@ -3867,7 +3912,12 @@ l2035:	jsr	rdkey
 
 l204d:	jsr	home
 	dmovi	sl3fw,cswl
+	if	iver==iver3a
+	lda	#crchar
+	jsr	cout
+	else
 	jsr	s1b86
+	endif
 	mov	#$01,d2005
 	rts
 
@@ -3897,7 +3947,7 @@ l2085:	jsr	rdkey
 	cmp	#8
 	bge	l206c
 	add	,#$c0,prcswl+1
-	inc	$2004
+	inc	d2004
 l209a:	rts
 
 	endif
@@ -4081,7 +4131,7 @@ getnum:	jsr	prntbf
 	jsr	outmsg
 	jsr	outbuf
 	mov	#25,cursrh
-	if	iver>=iver3b
+	if	iver>=iver3a
 	sta	cur80h
 	endif
 	mov	#$3f,invflg
@@ -4097,7 +4147,7 @@ getnum:	jsr	prntbf
 	jsr	rdkey
 	pha
 	mov	#$19,cursrh
-	if	iver>=iver3b
+	if	iver>=iver3a
 	sta	cur80h
 	endif
 	jsr	clreol
@@ -4411,6 +4461,7 @@ getrnd:	rol	rndloc+1
 
 	fillto	$21fc,$00
 	fcb	$fc,$19			; unused?
+	fcb	$00,$00
 
 	else
 
@@ -4440,18 +4491,40 @@ opends:	jsr	prntbf			; flush anything left in buffer
 
 halt:	jmp	halt			; die horribly
 
-	if	iver==iver3b
 	; junk
+	if	iver==iver3a
+
+	fcb	$00,$00,$00,$00,$00,$00,$00
+	fcb	$00,$00,$72,$1b,$00,$00,$02,$00
+	fcb	$01,$01,$d0,$2d,$20,$81,$1c,$a9
+	fcb	$29,$85,$e6,$a9,$21,$85,$e7,$a2
+	fcb	$1f,$20,$b6,$1e,$20,$81,$1c,$a9
+	fcb	$48,$85,$e6,$a9,$21,$85,$e7,$a2
+	fcb	$26,$20,$b6,$1e,$20,$f5,$1b,$20
+	fcb	$0c,$fd,$c9,$8d,$d0,$e6,$20,$81
+	fcb	$1c,$a9,$60,$8d,$41,$1e,$a9,$01
+	fcb	$8d,$42,$1e,$60,$20,$20,$20,$a2
+	fcb	$00,$a0,$02,$b1,$ba,$9d,$00,$02
+	fcb	$e8,$c8,$b1,$ba,$9d,$00,$02,$e8
+	fcb	$a9,$8a,$85,$e6,$a9,$00,$85,$e7
+	fcb	$a0,$03,$20,$00,$00,$a9,$9a,$85
+	fcb	$e6,$a9,$00,$85,$e7,$a0,$1e,$20
+	fcb	$00,$00,$a9,$c8,$85,$e6,$a9,$00
+	fcb	$85,$e7,$a0,$06,$20,$00,$00,$20
+	fcb	$a3,$1e,$b0,$00,$a2,$00,$a9,$28
+	fcb	$85,$e6,$a9,$02,$85,$e7,$a0,$00
+
+	elseif	iver==iver3b
+
 	fcb	$00,$00,$00,$00,$00,$00,$00,$00
 	fcb	$ee,$1b,$00,$00,$02,$00,$01,$01
 	fcb	$e7,$a2,$18,$20,$52,$1f,$20,$18
 	fcb	$1d,$a9
-	endif
 
 	endif
 
 	endif
 
-	fillto	vmtorg,$00
+	endif
 
 	end	start
