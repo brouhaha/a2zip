@@ -47,3 +47,13 @@ Eventually game images exceeded the 128KiB limit of ZIP version 3, therefore
 necessitating new ZIP versions 4, 5, and 6, also known as EZIP, XZIP, and YZIP,
 respectively. These are not represented here.
 
+## Acknowledgements
+
+Special thanks to:
+
+* Richard Turk, for saving the printed listing from the work I did in 1983,
+  which was otherwise lost
+
+* 4am, for preserving disk images of huge amounts of Apple II software,
+  including early, now-rare Infocom games (e.g., Zork I release 5,
+  Zork II release 7)
