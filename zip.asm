@@ -1762,7 +1762,7 @@ l12ac:	jsr	gtpnum			; get the property number
 	jsr	advppt			; advance pointer
 	jmp	l12ac			; and try again
 
-; got the property we wand
+; got the property we want
 
 l12be:	jsr	gtplen			; get property length
 	iny
