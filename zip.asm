@@ -448,9 +448,10 @@ l0917:	pha
 l090a:	jsr	fatal
 
 
-; class C instructions (implicit or no operand)
+; 0OP instructions (no operands, opcodes $80-$bf)
 
-optab1:	fdb	oprtnt			; return with TRUE
+optab_0op:
+	fdb	oprtnt			; return with TRUE
 	fdb	oprtnf			; return with FALSE
 	fdb	oppsi			; print string immediate
 	fdb	oppsic			; print string immediate, CRLF, return true
@@ -474,12 +475,13 @@ optab1:	fdb	oprtnt			; return with TRUE
 	fdb	opcksm			; checksum the program
 	endif
 
-opmax1	equ	(*-optab1)/2
+opmax_0op	equ	(*-optab_0op)/2
 
 
-; class B instructions (single operand)
+; 1OP instructions (single operand)
 
-optab2:	fdb	optstz			; compare ARG1=0 (ARG1<>0)
+optab_1op:
+	fdb	optstz			; compare ARG1=0 (ARG1<>0)
 	fdb	opgtsb			; get thing's sibling
 	fdb	opgtch			; get thing's child
 	fdb	opgtpr			; get thing's parent
@@ -495,13 +497,13 @@ optab2:	fdb	optstz			; compare ARG1=0 (ARG1<>0)
 	fdb	oppsw			; print string at word address
 	fdb	opmove			; move var ARG1 to var
 	fdb	opnot			; 1's complement
-opmax2	equ	(*-optab2)/2
+opmax_1op	equ	(*-optab_1op)/2
 
 
-; class A instructions (variable number of operands, may use short form
-; opcode)
+; 2OP instructions (two operands, opcodes $00-$7f)
 
-optab3:	fdb	opfatl
+optab_2op:
+	fdb	opfatl
 	fdb	opmtch			; match ARG1 against ARG2, ARG3, or ARG4
 	fdb	l0eb7			; ??? compare ARG1<=ARG2 (ARG1>ARG2)
 	fdb	l0ecf			; ??? compare ARG1>=ARG2 (ARG1<ARG2)
@@ -529,12 +531,14 @@ optab3:	fdb	opfatl
 	if	iver==iver1
 	fdb	oppsbi			; print string at indexed byte address
 	endif
-opmax3	equ	(*-optab3)/2
+opmax_2op	equ	(*-optab_2op)/2
 
 
-; class D instructions (variable number of operands)
+; EXT instructions (0 to 4 operands) from $e0-$ff
+; ($c0-$ff dispatch as 2OP)
 
-optab4:	fdb	opcall			; call procedure
+optab_ext:
+	fdb	opcall			; call procedure
 	fdb	opptwd			; store a word
 	fdb	opptby			; store a byte
 	fdb	opptp			; store into thing property
@@ -548,7 +552,7 @@ optab4:	fdb	opcall			; call procedure
 	fdb	x_opsplw		; split widnow
 	fdb	x_opsetw		; set window
 	endif
-opmax4	equ	(*-optab4)/2
+opmax_ext	equ	(*-optab_ext)/2
 
 
 mnloop:
@@ -622,12 +626,12 @@ l09d7:	pla				; get operand count back
 
 	jmp	l09af			; try for another
 
-l09ed:	dmovi	optab4,acc		; assume class D
-	lda	opcode			; but if it's $C0-$DF then it's class A
+l09ed:	dmovi	optab_ext,acc		; assume EXT $e0-$ff (0-4 operands)
+	lda	opcode			; but if it's $C0-$DF then it's the EXT form of a 2OP
 	cmpjl	#$e0,l0a98
 
 	sbc	#$e0			; adjust to $00..$1F
-	cmp	#opmax4			; make sure it's not illegal
+	cmp	#opmax_ext		; make sure it's not illegal
 
 	if	iver<iver3
 	jge	opfatl
@@ -660,10 +664,10 @@ dsptch:	jsr	dsptch
 
 	endif
 
-; process opcode group C ($80-$BF)
+; process 0OP instructions (no operands, opcodes $80-$bf)
 
 opcgpc:	sub	,#$b0			; adjust to $00..$0F
-	cmp	#opmax1			; make sure it's not illegal
+	cmp	#opmax_0op		; make sure it's not illegal
 
 	if	iver<iver3
 	jge	opfatl
@@ -672,7 +676,7 @@ opcgpc:	sub	,#$b0			; adjust to $00..$0F
 	endif
 
 	pha				; save it temp.
-	dmovi	optab1,acc		; get base address of proper table
+	dmovi	optab_0op,acc		; get base address of proper table
 	pla
 	jmp	godoit
 
@@ -681,7 +685,7 @@ l0a2b:	jsr	fatal			; oops!  illegal opcode
 	endif
 
 
-; process opcode group B ($80-$AF)
+; process 1OP instructions (single operand, opcodes $80-$AF)
 
 opcgpb:	and	#$30			; mask off operand type bits
 
@@ -694,7 +698,7 @@ l0a45:	mov	#$01,argcnt		; one argument
 
 	lda	opcode			; adjust opcode to $00..$0F
 	and	#$0f
-	cmp	#opmax2			; make sure it's not illegal
+	cmp	#opmax_1op		; make sure it's not illegal
 
 	if	iver<iver3
 	jge	opfatl
@@ -703,12 +707,12 @@ l0a45:	mov	#$01,argcnt		; one argument
 	endif
 
 	pha				; save tmep.
-	dmovi	optab2,acc		; get appropriate table base addr
+	dmovi	optab_1op,acc		; get appropriate table base addr
 	pla
 	jmp	godoit			; and go do it!
 
 
-; process opcode group A ($00-$7F)
+; process 2OP instructions (two operands, opcodes $00-$7f)
 
 opcgpa:	and	#$40			; get type bit for ARG1
 	jsreq	ftprby,l0a73		; 0:  byte immediate
@@ -725,7 +729,7 @@ l0a8a:	dmov	acc,arg2		; save it
 
 	lda	opcode			; get opcode back
 l0a98:	and	#$1f			; adjust to $00..$1F
-	cmp	#opmax3			; make sure it's not illegal
+	cmp	#opmax_2op		; make sure it's not illegal
 
 	if	iver<iver3
 	jge	opfatl
@@ -734,7 +738,7 @@ l0a98:	and	#$1f			; adjust to $00..$1F
 	endif
 
 	pha				; save temp.
-	dmovi	optab3,acc		; get base addr of appropriate table
+	dmovi	optab_2op,acc		; get base addr of appropriate table
 	pla
 	jmp	godoit			; and go do it!
 

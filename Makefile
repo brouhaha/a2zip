@@ -2,7 +2,13 @@ all: zip1.lst  zip1.bin  zip1-check \
      zip2.lst  zip2.bin  zip2-check \
      zip3.lst  zip3.bin  zip3-check \
      zip3a.lst zip3a.bin zip3a-check \
-     zip3b.lst zip3b.bin zip3b-check
+     zip3b.lst zip3b.bin zip3b-check \
+     ezip2a.lst ezip2a.bin ezip2a-check \
+     ezip2b.lst ezip2b.bin ezip2b-check \
+     ezip2c.lst ezip2c.bin ezip2c-check \
+     ezip2d.lst ezip2d.bin ezip2d-check \
+     ezip2h.lst ezip2h.bin ezip2h-check
+
 
 %.p %.lst: %.asm
 	asl $< -o $*.p -L
@@ -58,8 +64,59 @@ zip3b-check: zip3b.bin
 	echo "98ab866beb68f1d78b978a36106e611fd9196ffe7cd6d2e534c145197be3ebc1 zip3b.bin" | sha256sum -c -
 
 
+ezip2a.p ezip2a.lst: ezip.asm
+	asl ezip.asm -o ezip2a.p -L -OLIST ezip2a.lst -D iver='$$0201'
+
+ezip2a.bin: ezip2a.p
+	p2bin -r '$$d000-$$f6ff' ezip2a.p
+
+ezip2a-check: ezip2a.bin
+	echo "27791a3458d8c37a8db84a07dc74ce38ec902297a42acf578d259485a4b652db ezip2a.bin" | sha256sum -c
+
+
+ezip2b.p ezip2b.lst: ezip.asm
+	asl ezip.asm -o ezip2b.p -L -OLIST ezip2b.lst -D iver='$$0202'
+
+ezip2b.bin: ezip2b.p
+	p2bin -r '$$d000-$$f7ff' ezip2b.p
+
+ezip2b-check: ezip2b.bin
+	echo "86b3cfd5a834f304bdf8094ed56efaab5d75f318291590fdc4594c87c731f701 ezip2b.bin" | sha256sum -c
+
+
+ezip2c.p ezip2c.lst: ezip.asm
+	asl ezip.asm -o ezip2c.p -L -OLIST ezip2c.lst -D iver='$$0203'
+
+ezip2c.bin: ezip2c.p
+	p2bin -r '$$d000-$$f7ff' ezip2c.p
+
+ezip2c-check: ezip2c.bin
+	echo "9fd17f9952a447affc995948ae6356b83f68e828caed50dfaa850826083d5248 ezip2c.bin" | sha256sum -c
+
+
+ezip2d.p ezip2d.lst: ezip.asm
+	asl ezip.asm -o ezip2d.p -L -OLIST ezip2d.lst -D iver='$$0204'
+
+ezip2d.bin: ezip2d.p
+	p2bin -r '$$d000-$$f7ff' ezip2d.p
+
+ezip2d-check: ezip2d.bin
+	echo "2171db824068a23d9291031a20ea81bbbeea7d5af8174e42153adfb282dc99a5 ezip2d.bin" | sha256sum -c
+
+
+ezip2h.p ezip2h.lst: ezip.asm
+	asl ezip.asm -o ezip2h.p -L -OLIST ezip2h.lst -D iver='$$0208'
+
+ezip2h.bin: ezip2h.p
+	p2bin -r '$$d000-$$f7ff' ezip2h.p
+
+ezip2h-check: ezip2h.bin
+	echo "2683ce2f038bce968796540a3a9ce652a9e4120d06a75ee2e80c09cab7c09503 ezip2h.bin" | sha256sum -c
+
+
 clean:
-	rm -f zip[23].{p,lst,bin}
+	rm -f zip{1,2,3,3a,3b}.{p,lst,bin}
+	rm -f ezip2{a,b,c,d,h}.{p,lst,bin}
 
 
 .PRECIOUS: %.lst
