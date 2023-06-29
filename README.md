@@ -70,6 +70,7 @@ to 256 KiB, allowed a game to have more objects, allowed vocabulary words to
 have up to nine significant characters, and added some improvements to I/O
 capabilities. The v4 interpreters are known as EZIP. There were five
 revisions of the Apple II EZIP interpreter, designated 2A through 2D, and 2H.
+These require an Apple IIe, IIc, IIC+, or IIgs with at least 128 KiB of RAM.
 
 Early work on reverse-engineering these is present in the source file
 "ezip.asm". This does not use an include file for macro definitions.
