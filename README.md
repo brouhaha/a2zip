@@ -31,7 +31,11 @@ The provided Makefile is for GNU Make.
 
 The Apple II ZIP intepreters for v1, v2, v3, v3 A, and v3B can be built from
 the source file "zip.asm", which also uses an include file "zipmac.inc"
-defining various macros.
+defining various macros.  These interpreters depend on boot code and RWTS
+(disk routines) not included here. Aside from being relocated to a different
+start address, the RWTS routines are very similar to those Apple used in
+DOS 3.2.1 and DOS 3.3, with minor changes for the relatively simple
+copy protection.
 
 Z-Machine architectures v1 through v3 have only fairly minor differences. The
 interpreters for these versions are known as ZIP. The v1 and v2 architectures
@@ -59,9 +63,16 @@ printer interface card, which previously was required to be slot 1.
 
 Revision B added support for splitting the screen into two windows.
 
-Between Revision B and revision F, a substantial rearrangement of the
-code occurred. These and later changes to the v3 interpreter have not yet
-been analyzed, and are not currently represented here.
+## Later ZIP interpreters
+
+Between Revision B and revision F of the Apple II ZIP interpreters, a
+substantial rearrangement of the code occurred. These and later changes
+to the v3 interpreter have not yet been fully analyzed, and are not currently
+represented here.
+
+The disk I/O routines are derived from RWTS but no longer
+structured in the same way as RWTS, and are now more tightly integrated with
+the interpreter.
 
 ## EZIP
 
@@ -70,7 +81,16 @@ to 256 KiB, allowed a game to have more objects, allowed vocabulary words to
 have up to nine significant characters, and added some improvements to I/O
 capabilities. The v4 interpreters are known as EZIP. There were five
 revisions of the Apple II EZIP interpreter, designated 2A through 2D, and 2H.
-These require an Apple IIe, IIc, IIC+, or IIgs with at least 128 KiB of RAM.
+These interpeters require an Apple IIe, IIc, IIC+, or IIgs with at least
+128 KiB of RAM.
+
+As with later Apple II ZIP interpreter versions, the disk routines are more
+tightly integrated with the interpreter. In EZIP (and the later XZIP),
+games are usually distributed on two sides, designated A and B. Side A is
+bootable and contains the lower addressed portion of the game image, in the
+same mildly copy-protected form as the Apple II ZIP interpreters. Side B
+is encoded in an 18 sector per track format, similar in concept to
+Roland Gustafsson's RWTS18.
 
 Early work on reverse-engineering these is present in the source file
 "ezip.asm". This does not use an include file for macro definitions.
