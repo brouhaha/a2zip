@@ -16,10 +16,22 @@ a substantial portion of the Apple II version 1 through 3 ZIP interpreters.
 More recently I've partially reverse-engineered a few newer Apple II ZIP and
 EZIP interpreters.
 
+The reverse-engineered "source code" cross-assembles using the
+Macro Assembler AS, which is open source and supports common development
+host platforms.:
+    http://john.ccac.rwth-aachen.de:8000/as/
+
+No effort has been made to make it possible to assemble the code with
+any other assemblers, either native or cross. The code depends on the macro
+and local label capabilities of AS.
+
+The provided Makefile is for GNU Make.
+
 ## ZIP (Z-Machine architectures v1 through v3)
 
 The Apple II ZIP intepreters for v1, v2, v3, v3 A, and v3B can be built from
-the source file "zip.asm".
+the source file "zip.asm", which also uses an include file "zipmac.inc"
+defining various macros.
 
 Z-Machine architectures v1 through v3 have only fairly minor differences. The
 interpreters for these versions are known as ZIP. The v1 and v2 architectures
@@ -60,7 +72,7 @@ capabilities. The v4 interpreters are known as EZIP. There were five
 revisions of the Apple II EZIP interpreter, designated 2A through 2D, and 2H.
 
 Early work on reverse-engineering these is present in the source file
-"ezip.asm".
+"ezip.asm". This does not use an include file for macro definitions.
 
 ## XZIP and YZIP
 
@@ -71,12 +83,9 @@ These are not currently represented here.
 ## Archive of earliest reverse-engineered source files
 
 When I originally reverse-engineered the early interpreters in 1983-1984, I
-assembled the code using Microsoft ALDS, which is not reasily available
+assembled the code using Microsoft ALDS, which is not easily available
 or easy to use today. The version of the sources for that assembler are in
 the "alds" subdirectory.
-
-The current source code assembles using the Macro Assembler AS:
-    http://john.ccac.rwth-aachen.de:8000/as/
 
 ## Acknowledgements
 
