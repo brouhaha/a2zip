@@ -7,40 +7,42 @@
 
 	cpu	6502
 
-iver2a	equ	$0201		; 2A has exactly four save positions per disk, will only
+; The differences between revisions stated here is not comprehensizve.
+
+iver2a	equ	$0201		; Has exactly four save positions per disk, will only
 				; work for games that have up to 32 KiB saves.
-				; released with A Mind Forever Voyaging r77 850814
+				; Released with A Mind Forever Voyaging r77 850814
 
-iver2b	equ	$0202		; 2B allows disks to have three or four save positions,
+iver2b	equ	$0202		; Allows disks to have three or four save positions,
 				; supporting games with up to 46 KiB saves.
-				; 2B forces CSWL to be COUT1 at start.
-				; 2B adds "be patient" message to verify.
-				; 2B radically changes implementation of get_prop_addr,
+				; Forces CSWL to be COUT1 at start.
+				; Adds "be patient" message to verify.
+				; Radically changes implementation of get_prop_addr,
 				; purpose unknown.
-				; 2B changes random number generator, purpose unknown.
-				; 2B changes subroutine Seb96, purpose unknown.
-				; 2B changes some constants in save and restore,
+				; Changes random number generator, purpose unknown.
+				; Changes subroutine Seb96, purpose unknown.
+				; Changes some constants in save and restore,
 				; purpose unknown.
-				; released with Trinity r11 860509
+				; Released with Trinity r11 860509
 
-iver2c	equ	$0203		; 2C makes a change to deselecting output stream 3
+iver2c	equ	$0203		; Changes deselecting output stream 3
 				; (table), to prevent table stream stack underflow.
-				; 2C changes data tables used by random number generator,
+				; Changes data tables used by random number generator,
 				; purpose unknown.
-				; released with Bureaucracy r86 870212
+				; Released with Bureaucracy r86 870212
 
-iver2d	equ	$0204		; 2D changes spaces to tabs in save messages (probably
+iver2d	equ	$0204		; Changes spaces to tabs in save messages (probably
 				; by mistake).
-				; 2D changes a constant in scan_table, purpose unknown.
-				; released with Bureaucracy r116 870602
+				; Changes a constant in scan_table, purpose unknown.
+				; Released with Bureaucracy r116 870602
 
 ; No Apple II games with EZIP versions 2E through 2G have been found
 
-iver2h	equ	$0208		; 2H removes several calls to HOME.
-				; 2H changes the tabs in messages back to spaces.
-				; 2H adds two extra carriage returns at the end of
+iver2h	equ	$0208		; Removes several calls to HOME.
+				; Changes the tabs in messages back to spaces.
+				; Adds two extra carriage returns at the end of
 				; some messages.
-			 	; released with Nord and Bert r19 870723
+			 	; Released with Nord and Bert r19 870723
 
 
 char_tab	equ	$09
@@ -501,8 +503,7 @@ Sd03a:	stx	Z0e
 	ldy	#rwts_sec_buf_size
 	bne	.lp2a
 .loop2:	lda	rwts_sec_buf,y
-.lp2a:
-	eor	rwts_sec_buf-1,y
+.lp2a:	eor	rwts_sec_buf-1,y
 	tax
 	lda	nib_tab,x
 	ldx	Z0e
@@ -791,7 +792,7 @@ denib_tab	equ	*-$96
 ;	$01 = write 16-sector
 ;	$80 = read 18-sector
 rwts_inner:
-	sta	rwts_cmd		; command
+	sta	rwts_cmd
 	lda	#$02
 	sta	Dd475
 	asl

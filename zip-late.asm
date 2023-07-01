@@ -310,6 +310,7 @@ home	equ	$fc58
 clreol	equ	$fc9c
 rdkey	equ	$fd0c
 cout	equ	$fded
+cout1	equ	$fdf0
 bell	equ	$ff3a
 
 	org	$0900
@@ -391,9 +392,9 @@ S093a:	stx	Z6e
 ; write secondary buffer (reverse order)
 	tya
 	ldy	#rwts_sec_buf_size
-	bne	.lp2Z
+	bne	.lp2a
 .loop2:	lda	rwts_sec_buf,y
-.lp2Z:	eor	rwts_sec_buf-1,y
+.lp2a:	eor	rwts_sec_buf-1,y
 	tax
 	lda	nib_tab,x
 	ldx	Z6e
@@ -449,6 +450,8 @@ write_21:
 				; +6 jsr
 
 
+	if	iver<=iver3h
+
 post_nibble:
 	ldy	#$00
 .loop1:	ldx	#rwts_sec_buf_size
@@ -464,6 +467,8 @@ post_nibble:
 	cpy	Z6d
 	bne	.loop2
 	rts
+
+	endif
 
 
 read_data_field_16:
@@ -525,7 +530,8 @@ read_data_field_16:
 	bpl	.loop12
 	cmp	#$aa		; check for data field epilogue 2nd byte
 	beq	read_address_field_success
-read_data_field_16_fail:	sec
+read_data_field_16_fail:
+	sec
 	rts
 
 
@@ -592,7 +598,7 @@ seek_track:
 	sta	Z6e
 	sec
 	sbc	Z6c
-	beq	.fwd4
+	beq	.fwd5
 	bcs	.fwd1
 	eor	#$ff
 	inc	D0d3e
@@ -603,9 +609,9 @@ seek_track:
 	bcc	.fwd3
 	lda	Z6d
 .fwd3:	cmp	#$0c
-	bcs	denib_tab
+	bcs	.fwd4
 	tay
-	sec
+.fwd4:	sec
 	jsr	.subr1
 	lda	motor_on_time_tab,y
 	jsr	delay
@@ -616,7 +622,7 @@ seek_track:
 	jsr	delay
 	inc	Z6d
 	bne	.loop1
-.fwd4:	jsr	delay
+.fwd5:	jsr	delay
 	clc
 .subr1:	lda	D0d3e
 .subr2:	and	#$03
@@ -628,6 +634,13 @@ seek_track:
 .rtn:	rts
 
 
+	if	iver>=iver3k
+	align	$0100,$00
+	endif
+
+
+	if	iver<=iver3h
+
 delay:	ldx	#$11
 .loop1:	dex
 	bne	.loop1
@@ -638,6 +651,28 @@ delay:	ldx	#$11
 	sbc	#$01
 	bne	delay
 	rts
+
+	endif
+
+
+	if	iver>=iver3k
+
+S0cfc:	sta	Z6c
+	jsr	S0d1f
+	lda	D0d3e,y
+	bit	Z6a
+	bmi	L0d0b
+	lda	D0d46,y
+L0d0b:	sta	D0d3e
+	lda	Z6c
+	bit	Z6a
+	bmi	L0d19
+	sta	D0d46,y
+	bpl	L0d1c
+L0d19:	sta	D0d3e,y
+L0d1c:	jmp	seek_track
+
+	endif
 
 
 motor_on_time_tab:
@@ -673,6 +708,24 @@ denib_tab	equ	*-$96
 	fcb	$31,$32,$f0,$f1,$33,$34,$35,$36
 	fcb	$37,$38,$f8,$39,$3a,$3b,$3c,$3d
 	fcb	$3e,$3f
+
+
+	if	iver>=iver3k
+
+	align	$0100,$00
+
+delay:	ldx	#$11
+.loop1:	dex
+	bne	.loop1
+	inc	Z73
+	bne	.fwd1
+	inc	Z74
+.fwd1:	sec
+	sbc	#$01
+	bne	delay
+	rts
+
+	endif
 
 
 ; On entry:
@@ -803,18 +856,31 @@ L0cc2:	ldy	rwts_sector	; logical sector number
 	lda	D0835,y		; map to physical sector number via interleave table in boot1
 	cmp	Z70		; does it match physical sector number?
 	bne	L0c80		;   no
-
 	plp
 	bcs	L0ceb
 	jsr	read_data_field_16
+
+	if	iver<=iver3h
+
 	php
 	bcs	L0c80
 	plp
+
+	else
+
+	bcc	L0d08
+	clc
+	php
+	bcc	L0c80
+L0d08:
+
+	endif
 
 	ldx	#$00
 	stx	Z6d
 	jsr	post_nibble
 	ldx	D0d50
+
 L0cdf:	lda	#$00
 	clc
 	bcc	L0ce5
@@ -836,6 +902,8 @@ S0cf4:	asl
 	rts
 
 
+	if	iver<=iver3h
+
 S0cfc:	sta	Z6c
 	jsr	S0d1f
 	lda	D0d3e,y
@@ -850,6 +918,8 @@ L0d0b:	sta	D0d3e
 	bpl	L0d1c
 L0d19:	sta	D0d3e,y
 L0d1c:	jmp	seek_track
+
+	endif
 
 
 S0d1f:	txa
@@ -874,6 +944,28 @@ S0d26:	pha
 	bpl	.rtn
 .fwd1:	sta	D0d3e,y
 .rtn:	rts
+
+
+	if	iver>=iver3k
+
+post_nibble:
+	ldy	#$00
+.loop1:	ldx	#rwts_sec_buf_size
+.loop2:	dex
+	bmi	.loop1
+	lda	rwts_pri_buf,y
+	lsr	rwts_sec_buf,x
+	rol
+	lsr	rwts_sec_buf,x
+	rol
+	sta	(rwts_buf),y
+	iny
+	cpy	Z6d
+	bne	.loop2
+	rts
+
+	endif
+
 
 D0d3e:	fcb	$00,$00,$00,$00,$00,$00,$00,$00
 D0d46:	fcb	$00,$00,$00,$00,$00,$00,$00,$00
@@ -1077,7 +1169,7 @@ S0e91:	prt_msg	position
 	lda	Zf1
 	jsr	S0e02
 .loop2:	jsr	S11c5
-	cmp	#$0d
+	cmp	#char_cr
 	beq	.fwd3
 	sec
 	sbc	#'1'
@@ -1103,10 +1195,10 @@ S0e91:	prt_msg	position
 	lda	D0e34
 	jsr	S0e02
 .loop3:	jsr	S11c5
-	cmp	#$0d
+	cmp	#char_cr
 	beq	.fwd6
 	sec
-	sbc	#$31
+	sbc	#'1'
 	cmp	#$07
 	bcc	.fwd7
 	jsr	bell
@@ -2233,6 +2325,14 @@ op_show_status:
 	sta	cursrh
 	pla
 	sta	cur80h
+
+	if	iver>=iver3k
+	ldx	D172b
+	beq	.fwd13
+	sta	cursrh
+.fwd13:
+	endif
+
 	jsr	vtab
 	ldx	#$ff
 	stx	Zdf
@@ -2262,6 +2362,13 @@ interp_start:
 	lda	Z2b
 	sta	Z60
 	sta	Z61
+
+	if	iver>=iver3k
+	lda	#cout1>>8
+	sta	cswl+1
+	lda	#cout1&$ff
+	sta	cswl
+	endif
 
 	ldx	#$00
 	stx	rwts_sector
@@ -2514,14 +2621,8 @@ op_c0_ff:
 	cmp	#$e0
 	bcs	.fwd6
 	jmp	L19b3
-.fwd6:
-	if	iver==iver3f
-	ldx	#$94
-	else
-	ldx	#$85
-	endif
-
-	ldy	#$1b
+.fwd6:	ldx	#D1b94&$ff
+	ldy	#D1b94>>8
 	and	#$1f
 	cmp	#$0c
 	bcc	L1935
@@ -2917,7 +3018,7 @@ D1b62:	fdb	int_err_04	; [illegal]
 
 
 ; VAR instructions (0-4 operands), opcodes $e0..$ff
-	fdb	op_call
+D1b94:	fdb	op_call
 	fdb	op_storew
 	fdb	op_storeb
 	fdb	op_put_prop
