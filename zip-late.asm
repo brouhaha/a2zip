@@ -7,9 +7,15 @@
 
 	cpu	6502
 
-iver3f	equ	$0306
+; The differences between revisions stated here is not comprehensizve.
 
-iver3h	equ	$0308
+iver3f	equ	$0306	; Substantially rearranged compared to B.
+			; Incorporates RWTS-equivalent routines.
+
+iver3h	equ	$0308	; Sends 80-col sequence to printer firmware.
+			; Accepts backspace character.
+			; Quit says end of session rather than end of story.
+			; Doesn't use self-modifying code for verify.
 
 iver3k	equ	$030b
 
@@ -22,6 +28,7 @@ iver	equ	iver3f
 
 
 char_bs		equ	$08
+char_tab	equ	$09
 char_cr		equ	$0d
 char_del	equ	$7f
 
@@ -234,6 +241,9 @@ rwts_sec_buf:	rmb	rwts_sec_buf_size
 D2c00:		rmb	256
 D2d00:		rmb	256
 
+	if	iver>=iver3h
+D2e00:
+	endif
 		rmb	256
 
 stk_low_bytes:	rmb	256	; stack, low bytes
@@ -1131,11 +1141,15 @@ S0e91:	prt_msg	position
 
 .fwd10:	prt_msg	yes
 	lda	Zf3
+	if	iver==iver3f
 	sta	Zf1
+	endif
 	sta	Z62
 	inc	Z62
 	ldx	Zf4
+	if	iver==iver3f
 	stx	D0e34
+	endif
 	inx
 	txa
 	asl
@@ -1144,7 +1158,9 @@ S0e91:	prt_msg	position
 	asl
 	sta	Z60
 	lda	Zf2
+	if	iver==iver3f
 	sta	Zf0
+	endif
 	asl
 	asl
 	sta	rwts_track
@@ -1176,12 +1192,26 @@ msg_insert_story:
 msg_len_insert_story	equ	*-msg_insert_story
 
 
-S0ff8:	lda	D172e
+S0ff8:
+	if	iver>=iver3h
+	lda	Z62
+	pha
+	endif
+
+	lda	D172e
 	ldx	D172d
 	sta	Z62
 	stx	Z60
+
+	if	iver==iver3f
 	lda	Zf1
 	bne	.fwd2
+	else
+	pla
+	cmp	#$02
+	beq	.fwd2
+	endif
+
 .loop1:	prt_msg	insert_story
 	jsr	S0f9e
 	ldx	#$01
@@ -1275,8 +1305,17 @@ op_save:
 	bcs	.loop2
 	dec	Z8e
 	bne	.loop4
-
 	jsr	S0ff8
+
+	if	iver>=iver3h
+	lda	Zf3
+	sta	Zf1
+	lda	Zf4
+	sta	D0e34
+	lda	Zf2
+	sta	Zf0
+	endif
+
 	pla
 	sta	wndtop
 	jsr	home
@@ -1374,6 +1413,16 @@ op_restore:
 	lda	#$00
 	sta	Z99
 	jsr	S0ff8
+
+	if	iver>=iver3h
+	lda	Zf3
+	sta	Zf1
+	lda	Zf4
+	sta	D0e34
+	lda	Zf2
+	sta	Zf0
+	endif
+
 	pla
 	sta	wndtop
 	jsr	home
@@ -1385,10 +1434,14 @@ S11c5:	cld
 	pha
 	tya
 	pha
-.loop1:	lda	D172b
+.loop1:
+	if	iver==iver3f
+	lda	D172b
 	beq	.fwd0
 	lda	cur80h
 	sta	cursrh
+	endif
+
 .fwd0:	jsr	rdkey
 	and	#$7f
 	cmp	#$0d
@@ -1403,10 +1456,28 @@ S11c5:	cld
 	bne	.fwd3
 	jmp	.fwd6
 
-.fwd3:	cmp	#$20
+.fwd3:
+	if	iver>=iver3h
+	ldx	#D1243_len-1
+.loop1a:
+	cmp	D1243,x
+	beq	.fwd3a
+	dex
+	bpl	.loop1a
+	bmi	.fwd3b		; always taken
+
+.fwd3a:	lda	D124d,x
+	bne	.fwd6		; always taken
+
+.fwd3b:
+	endif
+
+	cmp	#$20
 	bcc	.fwd5
 	cmp	#$2b
 	beq	.fwd5
+
+	if	iver==iver3f
 	cmp	#$3c
 	bne	.fwd4
 	lda	#$2c
@@ -1456,6 +1527,7 @@ S11c5:	cld
 	bne	.fwd4i
 	lda	#$39
 	bne	.fwd6		; always taken
+	endif
 
 .fwd4i:	cmp	#$3c
 	bcc	.fwd6
@@ -1483,6 +1555,14 @@ S11c5:	cld
 	tax
 	lda	Ze2
 	rts
+
+
+	if	iver>=iver3h
+D1243:	fcb	"<_>)@%^&*("
+D1243_len	equ	*-D1243
+
+D124d:	fcb	",-.0256789"
+	endif
 
 
 S1275:	sta	Ze2
@@ -1529,6 +1609,12 @@ e_1296:	jsr	S156f
 	beq	.fwd3
 	cmp	#char_del
 	beq	.fwd1
+
+	if	iver>=iver3h
+	cmp	#char_bs
+	beq	.fwd1
+	endif
+
 	jsr	bell
 	jmp	.loop3
 
@@ -1557,9 +1643,20 @@ e_1296:	jsr	S156f
 	cmp	#$5b
 	bcs	.fwd4
 	adc	#$20
-.fwd4:	sta	(arg1),y
+.fwd4:
+	if	iver>=iver3h
+	and	#$7f
+	endif
+
+	sta	(arg1),y
 	dey
+
+	if	iver==iver3f
 	bpl	.loop4
+	else
+	bne	.loop4
+	endif
+
 	jsr	S1328
 	lda	Zc2
 	ldx	D172b
@@ -1603,11 +1700,13 @@ S1328:	lda	Zdf
 	pha
 	lda	D13ad
 	sta	cswl
-	lda	D13ae
+	lda	D13ad+1
 	sta	cswl+1
 	lda	#$00
 	sta	cursrh
 	sta	cur80h
+
+	if	iver==iver3f
 	lda	D13ac
 	cmp	#$01
 	bne	.fwd1
@@ -1615,7 +1714,7 @@ S1328:	lda	Zdf
 	lda	#$89
 	jsr	cout
 	lda	cswl+1
-	sta	D13ae
+	sta	D13ad+1
 	lda	cswl
 	sta	D13ad
 	lda	#$b8
@@ -1624,8 +1723,10 @@ S1328:	lda	Zdf
 	jsr	cout
 	lda	#$ce
 	jsr	cout
-	lda	#$8d
+	lda	#char_cr+$80
 	jsr	cout
+	endif
+
 .fwd1:	ldy	#$00
 .loop1:	lda	D0200,y
 	jsr	cout
@@ -1649,9 +1750,8 @@ msg_printer_slot
 msg_len_printer_slot	equ	 *-msg_printer_slot
 
 
-D13ac:	fcb	$00                     	; "."
-D13ad:	fcb	$00                     	; "."
-D13ae:	fcb	$00                     	; "."
+D13ac:	fcb	$00
+D13ad:	fdb	$0000
 
 
 S13af:	prt_msg	printer_slot
@@ -1668,9 +1768,39 @@ S13af:	prt_msg	printer_slot
 .fwd1:	lda	#$01
 .fwd2:	clc
 	adc	#$c0
-	sta	D13ae
+	sta	D13ad+1
 	jsr	S144e
 	inc	D13ac
+
+	if	iver>=iver3h
+; send sequence <Control-I>80N to convince printer firmware to use
+; 80 columns
+	lda	cswl
+	pha
+	lda	cswl+1
+	pha
+	lda	D13ad
+	sta	cswl
+	lda	D13ad+1
+	sta	cswl+1
+	lda	#char_tab+$80
+	jsr	cout
+	lda	#'8'+$80
+	jsr	cout
+	lda	#'0'+$80
+	jsr	cout
+	lda	#'N'+$80
+	jsr	cout
+	lda	cswl
+	sta	D13ad
+	lda	cswl+1
+	sta	D13ad+1
+	pla
+	sta	cswl+1
+	pla
+	sta	cswl
+	endif
+
 	rts
 
 
@@ -1778,7 +1908,11 @@ op_quit:
 
 
 msg_end_of_session:
+	if	iver==iver3f
 	text_str	"End of story."
+	else
+	text_str	"End of session."
+	endif
 	fcb	char_cr
 msg_len_end_of_session	equ	*-msg_end_of_session
 
@@ -2222,7 +2356,7 @@ restart:
 	inx
 	bne	.loop4
 	txa
-.loop5:	sta	D2442,x
+.loop5:	sta	D2e00,x
 	inx
 	bne	.loop5
 	inc	Z94
@@ -2380,7 +2514,13 @@ op_c0_ff:
 	cmp	#$e0
 	bcs	.fwd6
 	jmp	L19b3
-.fwd6:	ldx	#$94
+.fwd6:
+	if	iver==iver3f
+	ldx	#$94
+	else
+	ldx	#$85
+	endif
+
 	ldy	#$1b
 	and	#$1f
 	cmp	#$0c
@@ -2402,8 +2542,8 @@ L1946:	jsr	$0000
 	jmp	main_loop
 
 op_b0_bf:
-	ldx	#$26
-	ldy	#$1b
+	ldx	#D1b26&$ff
+	ldy	#D1b26>>8
 	and	#$0f
 	cmp	#$0e
 	bcc	L1935
@@ -2425,8 +2565,8 @@ op_80_af:
 	bne	int_err_03
 	jsr	S19ea
 .fwd3:	jsr	S19c7
-	ldx	#$42
-	ldy	#$1b
+	ldx	#D1b42&$ff
+	ldy	#D1b42>>8
 	lda	opcode
 	and	#$0f
 	cmp	#$10
@@ -2457,8 +2597,8 @@ op_00_7f:
 	lda	Z8c+1
 	sta	arg2+1
 	inc	argcnt
-L19b3:	ldx	#$62
-	ldy	#$1b
+L19b3:	ldx	#D1b62&$ff
+	ldy	#D1b62>>8
 	lda	opcode
 	and	#$1f
 	cmp	#$19
@@ -2849,9 +2989,34 @@ op_verify:
 	sta	Z8e
 	rol	Z8e+1
 	rol	acb
+
+	if	iver==iver3f
 	lda	#acb+1		; modify code in S236c subroutine
 	sta	L2376+1
 .loop2:	jsr	S236c
+
+	else
+
+	lda	#$00
+	sta	Zea
+	sta	Zeb
+	jmp	.fwd0a
+
+.loop2:	lda	Z9c
+	bne	.fwd0b
+.fwd0a	lda	#$29
+	sta	Zed
+	jsr	S0d6b
+.fwd0b:	ldy	Z9c
+	lda	rwts_data_buf,y
+	inc	Z9c
+	bne	.fwd0c
+	inc	Z9d
+	bne	.fwd0c
+	inc	Z9e
+.fwd0c:
+	endif
+
 	clc
 	adc	Z90
 	sta	Z90
@@ -2866,8 +3031,12 @@ op_verify:
 	lda	Z9e
 	cmp	acb
 	bne	.loop2
+
+	if	iver==iver3f
 	lda	#Za3+1		
 	sta	L2376+1		; modify code in S236c subroutine
+	endif
+
 	lda	hdr_checksum+1
 	cmp	Z90
 	bne	L1c41
@@ -3865,7 +4034,13 @@ L22aa:	cmp	D22b4,x
 	rts
 
 
-D22b4:	fcb	$21,$3f,$2c,$2e,$8d,$20      	; "!?,.. "
+D22b4:	fcb	"!?,."
+	if	iver==iver3f
+	fcb	char_cr+$80
+	else
+	fcb	char_cr
+	endif
+	fcb	" "
 
 
 S22ba:	tax
@@ -4033,18 +4208,24 @@ S23a2:	sta	Za8
 	jsr	S0d6b
 	bcs	int_err_0e
 .fwd1:	ldy	Za7
-	lda	D2442,y
+	lda	D2e00,y
 	cmp	Zaa
 	beq	.fwd4
 	inc	Zaa
 	bne	.fwd3
+
+	if	iver==iver3f
 	jsr	S2419
+	else
+	jsr	S243b
+	endif
+
 	ldx	#$00
-.loop3:	lda	D2442,x
+.loop3:	lda	D2e00,x
 	beq	.fwd2
 	sec
 	sbc	Za2
-	sta	D2442,x
+	sta	D2e00,x
 .fwd2:	inx
 	cpx	Za6
 	bcc	.loop3
@@ -4053,7 +4234,7 @@ S23a2:	sta	Za8
 	sbc	Za2
 	sta	Zaa
 .fwd3:	lda	Zaa
-	sta	D2442,y
+	sta	D2e00,y
 .fwd4:	lda	Za7
 	clc
 	adc	Za5
@@ -4067,17 +4248,49 @@ int_err_0e:
 
 S2419:	ldx	#$00
 	stx	Zab
-	lda	D2442
+	lda	D2e00
 	inx
-.loop1:	cmp	D2442,x
+.loop1:	cmp	D2e00,x
 	bcc	.fwd1
-	lda	D2442,x
+	lda	D2e00,x
 	stx	Zab
 .fwd1:	inx
 	cpx	Za6
 	bcc	.loop1
 	sta	Za2
 	rts
+
+
+	if	iver>=iver3h
+
+D243a:	fcb	$00
+
+S243b:	ldx	#$00
+	stx	Zab
+	sty	D243a
+.loop1:	lda	D2e00,x
+	cmp	#$00
+	bne	.fwd1
+	inx
+	cpx	Za6
+	bcc	.loop1
+	bcs	.fwd3
+
+.fwd1:	inx
+.loop2:	cmp	D2e00,x
+	bcc	.fwd2
+	ldy	D2e00,x
+	beq	.fwd2
+	tya
+	stx	Zab
+.fwd2:	inx
+	cpx	Za6
+	bcc	.loop2
+.fwd3:	sta	Za2
+	ldy	D243a
+	rts
+
+	endif
 
 
 S2433:	lda	Z8e
@@ -4090,7 +4303,11 @@ S2433:	lda	Z8e
 	rts
 
 
-D2442:	fcb	[256]$00
+	if	iver==iver3f
+; A buffer was allocated at $2e00, but in revision F, instead
+; of that buffer being used, another one is allocated here.
+D2e00:	fcb	[256]$00
+	endif
 
 
 S2542:	lda	Z8e

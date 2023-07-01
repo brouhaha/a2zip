@@ -4,6 +4,7 @@ all: zip1.lst  zip1.bin  zip1-check \
      zip3a.lst zip3a.bin zip3a-check \
      zip3b.lst zip3b.bin zip3b-check \
      zip3f.lst zip3f.bin zip3f-check \
+     zip3h.lst zip3h.bin zip3h-check \
      ezip2a.lst ezip2a.bin ezip2a-check \
      ezip2b.lst ezip2b.bin ezip2b-check \
      ezip2c.lst ezip2c.bin ezip2c-check \
@@ -65,7 +66,7 @@ zip3b-check: zip3b.bin
 	echo "98ab866beb68f1d78b978a36106e611fd9196ffe7cd6d2e534c145197be3ebc1 zip3b.bin" | sha256sum -c -
 
 
-zip3f.p zip3f.lst: zip.asm
+zip3f.p zip3f.lst: zip-late.asm
 	asl zip-late.asm -o zip3f.p -L -OLIST zip3f.lst -D iver='$$0306'
 
 zip3f.bin: zip3f.p
@@ -73,6 +74,16 @@ zip3f.bin: zip3f.p
 
 zip3f-check: zip3f.bin
 	echo "6bcc991eb5bdc55a6c0ddb6f307c630ee273f7b95ad0d5f3bc1d9e34ee0ed988 zip3f.bin" | sha256sum -c -
+
+
+zip3h.p zip3h.lst: zip-late.asm
+	asl zip-late.asm -o zip3h.p -L -OLIST zip3h.lst -D iver='$$0308'
+
+zip3h.bin: zip3h.p
+	p2bin -r '$$0900-$$27ff' zip3h.p
+
+zip3h-check: zip3h.bin
+	echo "7523c44811190cbce363eaf9ed04f67780794a86d849470acd5e0b8b6bb4d6a7 zip3h.bin" | sha256sum -c -
 
 
 ezip2a.p ezip2a.lst: ezip.asm
