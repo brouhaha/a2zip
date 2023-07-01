@@ -124,7 +124,7 @@ optab_idx	set	optab_idx+1
 		endm
 
 
-; disk variables
+; disk zero page variables
 		org	$00
 
 Z00:		rmb	1
@@ -135,10 +135,9 @@ rwts_sector:	rmb	1
 rwts_track:	rmb	1
 Z06:		rmb	1
 rwts_cmd:	rmb	1
-Z08:		rmb	1
-Z09:		rmb	1
+rwts_buf:	rmb	2
 Z0a:		rmb	1
-Z0b:		rmb	1
+rwts_slotx16:	rmb	1
 Z0c:		rmb	1
 Z0d:		rmb	1
 Z0e:		rmb	1
@@ -167,7 +166,7 @@ cswl	equ	$36
 rndloc	equ	$4e
 
 
-; interpreter variables
+; interpreter zero page variables
 	org	$56
 
 opcode:	rmb	1
@@ -319,11 +318,11 @@ D086a	equ	$086a
 S086b	equ	$086b
 
 		org	$0900
+rwts_sec_buf_size	equ	86
 
-rwts_buf	rmb	256	; user data
-
-disk_pri_buf:	rmb	256	; disk nibbles
-disk_sec_buf:	rmb	86	; disk nibbles
+rwts_data_buf	rmb	256	; user data
+rwts_pri_buf:	rmb	256	; disk nibbles
+rwts_sec_buf:	rmb	86	; disk nibbles
 
 	if	iver>=iver2b
 	align	$0100
@@ -372,15 +371,14 @@ hdr_arch	rmb	1	; Z-machine architecture version
 hdr_flags_1	rmb	1	; flags 1
 hdr_game_ver	rmb	2	; game version
 hdr_high_mem	rmb	2	; base of high memory
-hdr_init_pc	rmb	2	; initial value of program counter (byte adress)
-D1208	rmb	2	; location of dictionary
-D120a	rmb	2	; object table
-D120c	rmb	2	; global variable table
-D120e	rmb	2	; base of static memory
-D1210	rmb	1	; flags 2
-D1211	rmb	1
-	rmb	6	; "serial" (usually game release date)
-D1218	rmb	2	; abbreviation table
+hdr_init_pc	rmb	2	; initial value of program counter (byte address)
+hdr_vocab	rmb	2	; location of dictionary
+hdr_object	rmb	2	; object table
+hdr_globals	rmb	2	; global variable table
+hdr_pure	rmb	2	; base of pure (immutable) memory
+hdr_flags2	rmb	2	; flags 2
+		rmb	6	; "serial" (usually game release date)
+hdr_abbrev	rmb	2	; abbreviation table
 D121a	rmb	2	; length of file
 D121c	rmb	2	; checksum of file
 D121e	rmb	1	; interpreter number
@@ -406,7 +404,7 @@ text_on		equ	$c051
 mixed_off	equ	$c052
 txt_page_1	equ	$c054
 
-; Disk II I/O
+; Disk II I/O (indexed by slot x 16)
 ph_off	equ	$c080
 mtr_off	equ	$c088
 mtr_on	equ	$c089
@@ -417,9 +415,11 @@ q6h	equ	$c08d
 q7l	equ	$c08e
 q7h	equ	$c08f
 
-Sc300	equ	$c300
+; Apple slot 3 firmware (80-column)
+sl3fw	equ	$c300
 
 
+; Apple II monitor ROM locations
 			;      IIe  IIe       IIc  IIc   IIc
 			; IIe  enh  opt  IIc  3.5  mem1  mem2  IIc+  IIgs
 romid	equ	$fbb3	; $06  $06  $06  $06  $06  $06   $06   $06   $06f
@@ -456,22 +456,22 @@ pre_nibble:
 	ldx	#$00
 	ldy	#$02
 .loop1:	dey
-	lda	(Z08),y
+	lda	(rwts_buf),y
 	lsr
-	rol	disk_sec_buf,x
+	rol	rwts_sec_buf,x
 	lsr
-	rol	disk_sec_buf,x
-	sta	disk_pri_buf,y
+	rol	rwts_sec_buf,x
+	sta	rwts_pri_buf,y
 	inx
-	cpx	#$56
+	cpx	#rwts_sec_buf_size
 	bcc	.loop1
 	ldx	#$00
 	tya
 	bne	.loop1
-	ldx	#$55
-.loop2:	lda	disk_sec_buf,x
+	ldx	#rwts_sec_buf_size-1
+.loop2:	lda	rwts_sec_buf,x
 	and	#$3f
-	sta	disk_sec_buf,x
+	sta	rwts_sec_buf,x
 	dex
 	bpl	.loop2
 	rts
@@ -486,7 +486,7 @@ Sd03a:	stx	Z0e
 	lda	q7l,x
 	bmi	.exit
 
-	lda	disk_sec_buf
+	lda	rwts_sec_buf
 	sta	Z0d
 
 	lda	#$ff		; write a sync pattern
@@ -512,11 +512,11 @@ Sd03a:	stx	Z0e
 
 ; write secondary buffer (reverse order)
 	tya
-	ldy	#$56
+	ldy	#rwts_sec_buf_size
 	bne	.lp2a
-.loop2:	lda	disk_sec_buf,y
+.loop2:	lda	rwts_sec_buf,y
 .lp2a:
-	eor	disk_sec_buf-1,y
+	eor	rwts_sec_buf-1,y
 	tax
 	lda	nib_tab,x
 	ldx	Z0e
@@ -528,13 +528,13 @@ Sd03a:	stx	Z0e
 ; write primary buffer
 	lda	Z0d
 	nop
-.loop3:	eor	disk_pri_buf,y
+.loop3:	eor	rwts_pri_buf,y
 	tax
 	lda	nib_tab,x
 	ldx	Dd474
 	sta	q6h,x
 	lda	q6l,x
-	lda	disk_pri_buf,y
+	lda	rwts_pri_buf,y
 	iny
 	bne	.loop3
 
@@ -574,15 +574,15 @@ write_21:
 
 post_nibble:
 	ldy	#$00
-.loop1:	ldx	#$56
+.loop1:	ldx	#rwts_sec_buf_size
 .loop2:	dex
 	bmi	.loop1
-	lda	disk_pri_buf,y
-	lsr	disk_sec_buf,x
+	lda	rwts_pri_buf,y
+	lsr	rwts_sec_buf,x
 	rol
-	lsr	disk_sec_buf,x
+	lsr	rwts_sec_buf,x
 	rol
-	sta	(Z08),y
+	sta	(rwts_buf),y
 	iny
 	cpy	Z0d
 	bne	.loop2
@@ -603,7 +603,7 @@ read_data_field_16:
 	bpl	.loop4
 	cmp	#$aa		; check for data field prologue 2nd byte
 	bne	.loop3
-	ldy	#$56		; secondary buffer size
+	ldy	#rwts_sec_buf_size
 .loop5:	lda	q6l,x
 	bpl	.loop5
 	cmp	#$ad		; check for data field prologue 3rd byte
@@ -617,7 +617,7 @@ read_data_field_16:
 	bpl	.loop7
 	eor	denib_tab,y
 	ldy	Z0d
-	sta	disk_sec_buf,y
+	sta	rwts_sec_buf,y
 	bne	.loop6
 
 ; read primary buffer in forward order
@@ -626,14 +626,14 @@ read_data_field_16:
 	bpl	.loop9
 	eor	denib_tab,y
 	ldy	Z0d
-	sta	disk_pri_buf,y
+	sta	rwts_pri_buf,y
 	iny
 	bne	.loop8
 
 .loop10:
 	ldy	q6l,x
 	bpl	.loop10
-	cmp	denib_tab,y
+	cmp	denib_tab,y	; verify checksum
 	bne	read_data_field_16_fail
 
 .loop11:
@@ -663,17 +663,17 @@ read_address_field:
 	beq	read_data_field_16_fail
 .loop2:	lda	q6l,x
 	bpl	.loop2
-.loop3:	cmp	#$d5
+.loop3:	cmp	#$d5		; check for address field prologue 1st byte
 	bne	.loop1
 	nop
 .loop4:	lda	q6l,x
 	bpl	.loop4
-	cmp	#$aa
+	cmp	#$aa		; check for address field prologue 2nd byte
 	bne	.loop3
 	ldy	#$03
 .loop5:	lda	q6l,x
 	bpl	.loop5
-	cmp	#$96
+	cmp	#$96		; check for address field prologue 3rd byte
 	bne	.loop3
 	lda	#$00
 .loop6:	sta	Z0e
@@ -692,13 +692,13 @@ read_address_field:
 	bne	read_data_field_16_fail
 .loop9:	lda	q6l,x
 	bpl	.loop9
-	cmp	#$de
+	cmp	#$de		; check for address field epilogue 1st byte
 	bne	read_data_field_16_fail
 	nop
 .loop10:
 	lda	q6l,x
 	bpl	.loop10
-	cmp	#$aa
+	cmp	#$aa		; check for address field epilogue 2nd byte
 	bne	read_data_field_16_fail
 read_address_field_success:
 	clc
@@ -706,17 +706,17 @@ read_address_field_success:
 
 
 seek_track:
-	stx	Z0b		; slot
-	sta	Z0c		; track
+	stx	rwts_slotx16
+	sta	Z0c
 	cmp	Dd461
-	beq	.fwd5
+	beq	.rtn
 	lda	#$00
 	sta	Z0d
 .loop1:	lda	Dd461
 	sta	Z0e
 	sec
 	sbc	Z0c
-	beq	.fwd4
+	beq	.fwd5
 	bcs	.fwd1
 	eor	#$ff
 	inc	Dd461
@@ -727,9 +727,9 @@ seek_track:
 	bcc	.fwd3
 	lda	Z0d
 .fwd3:	cmp	#$0c
-	bcs	denib_tab
+	bcs	.fwd4
 	tay
-	sec
+.fwd4:	sec
 	jsr	.subr1
 	lda	motor_on_time_tab,y
 	jsr	delay
@@ -740,26 +740,25 @@ seek_track:
 	jsr	delay
 	inc	Z0d
 	bne	.loop1
-.fwd4:	jsr	delay
+.fwd5:	jsr	delay
 	clc
 .subr1:	lda	Dd461
 .subr2:	and	#$03
 	rol
-	ora	Z0b
+	ora	rwts_slotx16
 	tax
 	lda	ph_off,x
-	ldx	Z0b
-.fwd5:	rts
+	ldx	rwts_slotx16
+.rtn:	rts
 
 
 delay:	ldx	#$11
 .loop1:	dex
 	bne	.loop1
 	inc	Z13
-	bne	.noinchi
+	bne	.fwd1
 	inc	Z14
-.noinchi:
-	sec
+.fwd1:	sec
 	sbc	#$01
 	bne	delay
 	rts
@@ -881,8 +880,7 @@ rwts_inner:
 	php
 	bcc	.loop7		;   read
 
-; write command
-	jsr	pre_nibble
+	jsr	pre_nibble	; write
 
 .loop7:	lda	#48
 	sta	addr_field_search_retry_counter
@@ -942,10 +940,12 @@ rwts_inner:
 
 .fwd11:	lda	rwts_cmd
 	bmi	.fwd12
+
 	ldy	rwts_sector
 	lda	interleave_tab,y
 	cmp	Z10
 	bne	.loop9
+
 .fwd12:	plp
 	bcs	.fwd18
 	lda	rwts_cmd
@@ -1024,9 +1024,9 @@ Sd449:	pha
 	bit	Z0a
 	bmi	.fwd1
 	sta	Dd469,y
-	bpl	.fwd2
+	bpl	.rtn
 .fwd1:	sta	Dd461,y
-.fwd2:	rts
+.rtn:	rts
 
 
 Dd461:	fcb	$00,$00,$00,$00,$00,$00,$00,$00
@@ -1092,7 +1092,7 @@ read_data_field_18:
 	bpl	.loop9
 	eor	denib_tab,y
 	ldy	Z0d
-	sta	disk_sec_buf,y
+	sta	rwts_sec_buf,y
 	bne	.loop8
 
 .loop10:			; read 256 nibbles into primary buffer, forward order
@@ -1102,7 +1102,7 @@ read_data_field_18:
 	bpl	.loop11
 	eor	denib_tab,y
 	ldy	Z0d
-	sta	disk_pri_buf,y
+	sta	rwts_pri_buf,y
 	iny
 	bne	.loop10
 
@@ -1125,16 +1125,19 @@ read_data_field_18:
 e_d505:	lda	text_on
 	lda	mixed_off
 	lda	txt_page_1
-	lda	#$09
-	sta	Z09
-	lda	#$00
-	sta	Z08
+
+	lda	#rwts_data_buf>>8
+	sta	rwts_buf+1
+	lda	#rwts_data_buf&$ff
+	sta	rwts_buf
+
 	lda	#$01
 	sta	Z02
 	sta	Z03
 	rts
 
 
+; convert block number to track and sector
 Sd51d:	lda	#$00
 	sta	rwts_track
 	ldx	disk_block_num+1
@@ -1165,7 +1168,7 @@ Sd51d:	lda	#$00
 	tax
 	tya
 
-; convert block number to track and sector, 18-sector (side B)
+; 18-sector (side B)
 ;restoring divsion by 18 sectors/track for side B
 	sec
 .loop1:	sbc	#18
@@ -1225,7 +1228,7 @@ Sd51d:	lda	#$00
 	sta	wr_main_ram,y	; indexed to get main or card
 
 	ldy	#$00
-.loop2:	lda	rwts_buf,y
+.loop2:	lda	rwts_data_buf,y
 	sta	(Zb2),y
 	iny
 	bne	.loop2
@@ -1265,10 +1268,11 @@ Ld5c8:	inc	rwts_sector
 	clc
 	rts
 
+
 Sd5df:	ldy	#$00
 	sta	rd_main_ram
 .loop1:	lda	(Zb2),y
-	sta	rwts_buf,y
+	sta	rwts_data_buf,y
 	iny
 	bne	.loop1
 	lda	#$01
@@ -1295,7 +1299,7 @@ read_sector:
 	ldy	#$00
 	sta	rd_main_ram
 
-.loop1:	lda	rwts_buf,y
+.loop1:	lda	rwts_data_buf,y
 	sta	(Zb2),y
 	iny
 	bne	.loop1
@@ -1345,9 +1349,11 @@ Sd64a:	clc
 	sta	Dd646
 	prt_msg_ret	default_is
 
+
 	if	iver>=iver2b
 max_save_position:	fcb	$00
 	endif
+
 
 msg_position:
 	fcb	char_cr
@@ -1357,19 +1363,24 @@ msg_position:
 	else
 msg_position_max_ascii:	text_str	"*"
 	endif
+
 msg_len_position	equ	*-msg_position
+
 
 msg_drive:
 	fcb	char_cr
 	text_str	"Drive 1 or 2"
 msg_len_drive	equ	*-msg_drive
 
+
 msg_slot:
 	fcb	char_cr
 	text_str	"Slot 1-7"
 msg_len_slot	equ	*-msg_slot
 
+
 Dd67c:	fcb	$05
+
 
 msg_pos_drive_slot_verify:
 	fcb	char_cr,char_cr
@@ -1380,6 +1391,7 @@ Dd69a:	text_str	"*."
 	fcb	char_cr
 	text_str	"Are you sure? (Y/N) >"
 msg_len_pos_drive_slot_verify	equ	*-msg_pos_drive_slot_verify
+
 
 msg_insert_save:
 	fcb	char_cr
@@ -1408,18 +1420,19 @@ Sd6d9:	prt_msg	position
 	lda	Ze1
 	jsr	Sd64a
 .loop1:	jsr	Sda78
-	cmp	#$0d
+	cmp	#char_cr
 	beq	.fwd1
 	sec
-	sbc	#$31
+	sbc	#'1'
 	if	iver==iver2a
-	cmp	#$04
+	cmp	#4
 	else
 	cmp	max_save_position
 	endif
 	bcc	.fwd2
 	jsr	Sdd39
 	jmp	.loop1
+
 .fwd1:	lda	Ze1
 .fwd2:	sta	Ze3
 	clc
@@ -1436,8 +1449,8 @@ Sd6d9:	prt_msg	position
 	cmp	#$0d
 	beq	.fwd3
 	sec
-	sbc	#$31
-	cmp	#$02
+	sbc	#'1'
+	cmp	#2
 	bcc	.fwd4
 	jsr	Sdd39
 	jmp	.loop2
@@ -1445,14 +1458,14 @@ Sd6d9:	prt_msg	position
 .fwd3:	lda	Ze2
 .fwd4:	sta	Ze4
 	clc
-	adc	#$31
+	adc	#'1'
 	sta	Dd6d0
 	sta	Dd692
 	ora	#$80
 	jsr	Sdaee
+
 	lda	romid2_save	; IIc family?
 	bne	.fwd5		;   no
-
 	lda	#$05		; yes, force slot 5
 	bne	.fwd7
 
@@ -1471,28 +1484,29 @@ Sd6d9:	prt_msg	position
 .fwd6:	lda	Dd67c
 .fwd7:	sta	Ze5
 	clc
-	adc	#$31
+	adc	#'1'
 	sta	Dd69a
+
 	ldx	romid2_save	; IIc family?
 	beq	.fwd8		;   yes
-
 	ora	#$80		; no
 	jsr	Sdaee
 
 .fwd8:	prt_msg	pos_drive_slot_verify
 .loop4:	jsr	Sda78
-	cmp	#$79
+	cmp	#'y'
 	beq	.fwd10
-	cmp	#$59
+	cmp	#'Y'
 	beq	.fwd10
-	cmp	#$0d
+	cmp	#char_cr
 	beq	.fwd10
-	cmp	#$6e
+	cmp	#'n'
 	beq	.fwd9
-	cmp	#$4e
+	cmp	#'N'
 	beq	.fwd9
 	jsr	Sdd39
 	jmp	.loop4
+
 .fwd9:	prt_msg	no
 	jmp	Sd6d9
 
@@ -1548,7 +1562,7 @@ Sd6d9:	prt_msg	position
 
 Sd7f2:	prt_msg	press_return
 .loop5:	jsr	Sda78
-	cmp	#$0d
+	cmp	#char_cr
 	beq	.fwd13
 	jsr	Sdd39
 	jmp	.loop5
@@ -1565,12 +1579,14 @@ msg_press_return:
 	endif
 msg_len_press_return	equ	*-msg_press_return
 
+
 	if	iver>=iver2b
 save_start_track_tbl:	fcb	$00,$0b,$17		; three save positions
 			fcb	$00,$08,$11,$19		; four save positions
 save_start_sector_tbl:	fcb	$00,$08,$00		; three save positions
 			fcb	$00,$08,$00,$08		; four save positions
 	endif
+
 
 msg_insert_story:
 	fcb	char_cr
@@ -1590,7 +1606,7 @@ Dd833:	text_str	"* of the STORY disk into Drive #1."
 msg_len_insert_story	equ	*-msg_insert_story
 
 
-Sd856:	lda	#$31
+Sd856:	lda	#'1'
 	sta	Dd833
 	lda	#$01
 	sta	Ze7
@@ -1604,7 +1620,7 @@ Sd856:	lda	#$31
 	lda	#$00
 	jsr	rwts
 	bcs	.loop1
-	bcc	Ld8ac
+	bcc	Ld8ac		; always taken
 
 Sd87e:	lda	#$32
 	sta	Dd833
@@ -1713,7 +1729,7 @@ op_save:
 	bne	.loop3
 	lda	Z81
 	sta	Zb3
-	ldx	D120e
+	ldx	hdr_pure
 	inx
 	stx	Z6d
 .loop4:	jsr	Sd5df
@@ -1796,9 +1812,9 @@ op_restore:
 	sta	cursrv
 	jsr	vtab
 	jmp	Le120
-.fwd1:	lda	D1210
+.fwd1:	lda	hdr_flags2
 	sta	Z6d
-	lda	D1211
+	lda	hdr_flags2+1
 	sta	Z6e
 
 	if	iver==iver2a
@@ -1819,10 +1835,10 @@ op_restore:
 	jsr	read_sector
 	bcs	.loop2
 	lda	Z6d
-	sta	D1210
+	sta	hdr_flags2
 	lda	Z6e
-	sta	D1211
-	lda	D120e
+	sta	hdr_flags2+1
+	lda	hdr_pure
 	sta	Z6d
 .loop5:	jsr	read_sector
 	bcs	.loop2
@@ -2085,8 +2101,9 @@ msg_out:
 	dec	Z6f
 	bne	.loop1
 	rts
-Ldbf2:	rts
 
+
+Ldbf2:	rts
 
 Sdbf3:	lda	Zd4
 	beq	Ldbf2
@@ -2335,12 +2352,14 @@ interp_start:
 	lda	Z2b
 	sta	Z00
 	sta	Z01
+
 	if	iver>=iver2b
 	lda	#cout1>>8
 	sta	cswl+1
 	lda	#cout1&$ff
 	sta	cswl
 	endif
+
 	ldx	#$00
 	stx	rwts_sector
 	stx	Zb2
@@ -2356,6 +2375,7 @@ interp_start:
 
 	lda	#25		; sector count
 	sta	Z6d
+
 .loop1:	jsr	read_sector
 	dec	Z6d
 	bne	.loop1
@@ -2373,7 +2393,7 @@ interp_start:
 	beq	.fwd2
 	jsr	Sdd3c
 	bcs	computer_inadequate
-.fwd2:	jsr	Sc300
+.fwd2:	jsr	sl3fw
 Lddc4:	lda	Z01
 	ldx	Z03
 	sta	Ddd82
@@ -2405,9 +2425,10 @@ Lddc4:	lda	Z01
 	sta	Ded07
 	jsr	Sd51d
 
-	lda	hdr_arch	; game header - version
+	lda	hdr_arch	; check header architecture version version
 	cmp	#$04
 	beq	Lde21
+
 	lda	#$0f
 	jmp	int_error
 
@@ -2420,7 +2441,7 @@ computer_inadequate:
 
 Lde21:
 	if	iver>=iver2b
-	lda	D120e		; game header - ?
+	lda	hdr_pure	; heck header size of impure memory
 	cmp	#$ad
 	bcc	.fwd1a
 
@@ -2455,30 +2476,35 @@ Lde21:
 	lda	#80
 	sta	D1221
 
-	lda	D120c
+	lda	hdr_globals
 	clc
 	adc	Z81
 	sta	Z84
-	lda	D120c+1
+	lda	hdr_globals+1
 	sta	Z83
-	lda	D1218
+
+	lda	hdr_abbrev
 	clc
 	adc	Z81
 	sta	Z88
-	lda	D1218+1
+	lda	hdr_abbrev+1
 	sta	Z87
-	lda	D120a
+
+	lda	hdr_object
 	clc
 	adc	Z81
 	sta	Z8a
-	lda	D120a+1
+	lda	hdr_object+1
 	sta	Z89
+
 	jsr	Seeef
 	jsr	home
+
 	lda	hdr_init_pc
 	sta	pc+1
 	lda	hdr_init_pc+1
 	sta	pc
+
 	jsr	Sedc1
 	ldx	wndwdt
 	dex
@@ -2488,8 +2514,8 @@ Lde21:
 	lda	#$01
 	sta	Ddc34
 	sta	ostream_2_state
-	ora	D1211
-	sta	D1211
+	ora	hdr_flags2+1
+	sta	hdr_flags2+1
 .fwd3:	jsr	home
 
 inst_fetch:
@@ -2996,9 +3022,9 @@ Se1e3:	lda	arg1
 
 
 ; unreferenced?
-Le1ec:	lda	D1211
+Le1ec:	lda	hdr_flags2+1
 	ora	#$04
-	sta	D1211
+	sta	hdr_flags2+1
 	rts
 
 
@@ -3024,11 +3050,11 @@ Le1ec:	lda	D1211
 
 ; 1OP instructions (one operand), opcodes $80..$af
 	optab_start	tab_1op,16
-	optab_ent	op_jz		; jz
+	optab_ent	op_jz
 	optab_ent	op_get_sibling
 	optab_ent	op_get_child
 	optab_ent	op_get_parent
-	optab_ent	op_get_prop_len
+	optab_ent	op_get_prop_len	; get length of property (given addr)
 	optab_ent	op_inc
 	optab_ent	op_dec
 	optab_ent	op_print_addr
@@ -3064,13 +3090,13 @@ Le1ec:	lda	D1211
 	optab_ent	op_loadb
 	optab_ent	op_get_prop
 	optab_ent	op_get_prop_addr
+	optab_ent	op_get_next_prop
 	optab_ent	op_add
 	optab_ent	op_sub
 	optab_ent	op_mul
 	optab_ent	op_div
 	optab_ent	op_mod
-	optab_ent	op_call_2s
-	optab_ent	op_call
+	optab_ent	op_call		; call_2s
 	optab_ent	int_err_04
 	optab_ent	int_err_04
 	optab_ent	int_err_04
@@ -3199,7 +3225,7 @@ op_verify:
 	endif
 
 .fwd2:	ldy	Z7b
-	lda	rwts_buf,y
+	lda	rwts_data_buf,y
 	inc	Z7b
 	bne	.fwd3
 	inc	Z7c
@@ -3837,7 +3863,8 @@ op_get_prop_addr:
 Le6ce:	jmp	Le120
 
 
-op_add:	jsr	Sf1e3
+op_get_next_prop:
+	jsr	Sf1e3
 	lda	arg2
 	beq	.fwd2
 .loop1:	jsr	Sf201
@@ -3853,7 +3880,8 @@ op_add:	jsr	Sf1e3
 	jmp	Se124
 
 
-op_sub:	lda	arg1
+op_add:
+	lda	arg1
 	clc
 	adc	arg2
 	tax
@@ -3862,7 +3890,8 @@ op_sub:	lda	arg1
 	jmp	Le503
 
 
-op_mul:	lda	arg1
+op_sub:
+	lda	arg1
 	sec
 	sbc	arg2
 	tax
@@ -3871,7 +3900,7 @@ op_mul:	lda	arg1
 	jmp	Le503
 
 
-op_div:	jsr	Se7c6
+op_mul:	jsr	Se7c6
 .loop1:	ror	Zcc
 	ror	Zcb
 	ror	arg2+1
@@ -3891,13 +3920,14 @@ op_div:	jsr	Se7c6
 	jmp	Le503
 
 
-op_mod:	jsr	Se744
+op_div:
+	jsr	Se744
 	ldx	Zc7
 	lda	Zc8
 	jmp	Le503
 
 
-op_call_2s:
+op_mod:
 	jsr	Se744
 	ldx	Zc9
 	lda	Zca
@@ -4516,8 +4546,8 @@ Seb5f:	ldx	#$05
 
 
 Seb6b:	sta	Zd7
-	lda	D1208
-	ldy	D1208+1
+	lda	hdr_vocab
+	ldy	hdr_vocab+1
 	sta	Z7c
 	sty	Z7b
 	lda	#$00
@@ -4539,8 +4569,8 @@ Leb94:	sec
 	rts
 
 
-Seb96:	lda	D1208
-	ldy	D1208+1
+Seb96:	lda	hdr_vocab
+	ldy	hdr_vocab+1
 	sta	Z7c
 	sty	Z7b
 	lda	#$00
@@ -6002,9 +6032,9 @@ ostream_deselect_1:
 ostream_select_2:
 	inx
 	stx	ostream_2_state
-	lda	D1211
+	lda	hdr_flags2+1
 	ora	#$01
-	sta	D1211
+	sta	hdr_flags2+1
 	lda	Ddc34
 	bne	.rtn
 	jsr	Sdc37
@@ -6012,9 +6042,9 @@ ostream_select_2:
 
 ostream_deselect_2:
 	stx	ostream_2_state
-	lda	D1211
+	lda	hdr_flags2+1
 	and	#$fe
-	sta	D1211
+	sta	hdr_flags2+1
 	rts
 
 ; output stream 3 is a Z-machine table
