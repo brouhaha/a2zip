@@ -167,7 +167,8 @@ rndloc	equ	$4e
 
 
 ; interpreter zero page variables
-	org	$56
+interp_zp_origin	equ	$56
+	org	interp_zp_origin
 
 opcode:	rmb	1
 argcnt:	rmb	1
@@ -185,7 +186,7 @@ Z68:	rmb	1
 Z69:	rmb	1
 Z6a:	rmb	1
 
-Z6b:	rmb	2
+acc:	rmb	2
 
 Z6d:	rmb	1
 Z6e:	rmb	1
@@ -334,57 +335,42 @@ D0c56:	rmb	128
 D0cd6:	rmb	128
 
 ; data stack, 256 words, builds upward
-D0d56	rmb	$0100
-D0e56	rmb	$0100
-D0f56	rmb	$0100
-D1056	rmb	$0100
+D0d56:	rmb	$0100
+D0e56:	rmb	$0100
+D0f56:	rmb	$0100
+D1056:	rmb	$0100
 
-; D1156.. is probably the local variables
-; possibly there is space for 16 reserved instead of only 15
-D1156	rmb	1
-D1157	rmb	1
-D1158	rmb	1
-D1159	rmb	1
-D115a	rmb	1
-D115b	rmb	1
-D115c	rmb	2
-D115e	rmb	1
-D115f	rmb	1
-D1160	rmb	1
-D1161	rmb	1
-D1162	rmb	1
-D1163	rmb	1
-	rmb	$12
-D1176	rmb	1
-D1177	rmb	1
-D1178	rmb	1
-D1179	rmb	1
-D117a	rmb	1
-D117b	rmb	1
-D117c	rmb	1	; size unknown
+local_vars:	rmb	30
+
+		rmb	2
+
+D1176:		rmb	2	; save hdr_game_ver
+D1178:		rmb	2	; save Zeb
+D117a:		rmb	2	; save Zed
+D117c:		rmb	3	; save PC
 
 	align	$0100
 
 ; game header
 
-hdr_arch	rmb	1	; Z-machine architecture version
-hdr_flags_1	rmb	1	; flags 1
-hdr_game_ver	rmb	2	; game version
-hdr_high_mem	rmb	2	; base of high memory
-hdr_init_pc	rmb	2	; initial value of program counter (byte address)
-hdr_vocab	rmb	2	; location of dictionary
-hdr_object	rmb	2	; object table
-hdr_globals	rmb	2	; global variable table
-hdr_pure	rmb	2	; base of pure (immutable) memory
-hdr_flags2	rmb	2	; flags 2
+hdr_arch:	rmb	1	; Z-machine architecture version
+hdr_flags_1:	rmb	1	; flags 1
+hdr_game_ver:	rmb	2	; game version
+hdr_high_mem:	rmb	2	; base of high memory
+hdr_init_pc:	rmb	2	; initial value of program counter (byte address)
+hdr_vocab:	rmb	2	; location of dictionary
+hdr_object:	rmb	2	; object table
+hdr_globals:	rmb	2	; global variable table
+hdr_pure:	rmb	2	; base of pure (immutable) memory
+hdr_flags2:	rmb	2	; flags 2
 		rmb	6	; "serial" (usually game release date)
-hdr_abbrev	rmb	2	; abbreviation table
-D121a	rmb	2	; length of file
-D121c	rmb	2	; checksum of file
-D121e	rmb	1	; interpreter number
-D121f	rmb	1	; interpreter version
-D1220	rmb	1	; screen height, characters
-D1221	rmb	1	; screen width, characters
+hdr_abbrev:	rmb	2	; abbreviation table
+hdr_length:	rmb	2	; length of file
+hdr_checksum:	rmb	2	; checksum of file
+hdr_interp_ver:	rmb	1	; interpreter version number
+hdr_interp_rev:	rmb	1	; interpreter reversion
+hdr_scr_height:	rmb	1	; screen height, characters
+hdr_scr_width:	rmb	1	; screen width, characters
 
 
 D1000	equ	$1000		; used for memory test at startup only, otherwise
@@ -1436,7 +1422,7 @@ Sd6d9:	prt_msg	position
 .fwd1:	lda	Ze1
 .fwd2:	sta	Ze3
 	clc
-	adc	#$31
+	adc	#'1'
 	sta	Dd688
 	sta	Dd8d1
 	sta	Dd99d
@@ -1476,7 +1462,7 @@ Sd6d9:	prt_msg	position
 	cmp	#$0d
 	beq	.fwd6
 	sec
-	sbc	#$31
+	sbc	#'1'
 	cmp	#$07
 	bcc	.fwd7
 	jsr	Sdd39
@@ -1677,15 +1663,15 @@ op_save:
 	lda	hdr_game_ver
 	sta	D1176
 	lda	hdr_game_ver+1
-	sta	D1177
+	sta	D1176+1
 	lda	Zeb
 	sta	D1178
 	lda	Zeb+1
-	sta	D1179
+	sta	D1178+1
 	lda	Zed
 	sta	D117a
 	lda	Zed+1
-	sta	D117b
+	sta	D117a+1
 
 	ldx	#$02
 .loop1:	lda	pc,x
@@ -1693,15 +1679,11 @@ op_save:
 	dex
 	bpl	.loop1
 
-	if	iver==iver2a
-	lda	#$11
-	else
-	lda	#$12
-	endif	
-
+	lda	#(hdr_arch>>8)-1
 	sta	Zb3
 	jsr	Sd5df
 	bcc	.fwd1
+
 .loop2:	jsr	Sd87e
 
 	if	iver<=iver2d
@@ -1711,15 +1693,9 @@ op_save:
 	lda	#$16
 	sta	cursrv
 	jsr	vtab
-	jmp	Le120
+	jmp	store_result_zero
 
-.fwd1:
-	if	iver==iver2a
-	lda	#$0d
-	else
-	lda	#$0e
-	endif	
-
+.fwd1:	lda	#(hdr_arch>>8)-5
 	sta	Zb3
 	lda	#$04
 	sta	Z73
@@ -1736,6 +1712,7 @@ op_save:
 	bcs	.loop2
 	dec	Z6d
 	bne	.loop4
+
 	jsr	Sd87e
 
 	if	iver<=iver2d
@@ -1753,13 +1730,14 @@ op_save:
 	sta	Ze1
 	lda	#$01
 	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
 
 msg_restore_position:
 	text_str	"Restore Position"
 	fcb	char_cr
 msg_len_restore_position	equ	*-msg_restore_position
+
 
 msg_restoring_position:
 	fcb	char_cr,char_cr
@@ -1778,51 +1756,45 @@ op_restore:
 	prt_msg	restore_position
 	jsr	Sd6d9
 	prt_msg	restoring_position
+
 	ldx	#$1f
-.loop1:	lda	D1156,x
+.loop1:	lda	local_vars,x
 	sta	D0100,x
 	dex
 	bpl	.loop1
 
-	if	iver==iver2a
-	lda	#$11
-	else
-	lda	#$12
-	endif	
-
+	lda	#(hdr_arch>>8)-1
 	sta	Zb3
 	jsr	read_sector
 	bcs	.loop2
 	lda	D1176
 	cmp	hdr_game_ver
 	bne	.loop2
-	lda	D1177
+	lda	D1176+1
 	cmp	hdr_game_ver+1
 	beq	.fwd1
+
 .loop2:	ldx	#$1f
 .loop3:	lda	D0100,x
-	sta	D1156,x
+	sta	local_vars,x
 	dex
 	bpl	.loop3
 	jsr	Sd87e
+
 	if	iver<=iver2d
 	jsr	home
 	endif
 	lda	#$16
 	sta	cursrv
 	jsr	vtab
-	jmp	Le120
+	jmp	store_result_zero
+
 .fwd1:	lda	hdr_flags2
 	sta	Z6d
 	lda	hdr_flags2+1
 	sta	Z6e
 
-	if	iver==iver2a
-	lda	#$0d
-	else
-	lda	#$0e
-	endif	
-
+	lda	#(hdr_arch>>8)-5
 	sta	Zb3
 	lda	#$04
 	sta	Z73
@@ -1844,13 +1816,15 @@ op_restore:
 	bcs	.loop2
 	dec	Z6d
 	bne	.loop5
+
 	lda	D1178
 	sta	Zeb
-	lda	D1179
+	lda	D1178+1
 	sta	Zeb+1
+
 	lda	D117a
 	sta	Zed
-	lda	D117b
+	lda	D117a+1
 	sta	Zed+1
 
 	ldx	#$02
@@ -1877,7 +1851,7 @@ op_restore:
 	sta	Ze1
 	lda	#$02
 	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
 
 Sda78:	cld
@@ -1913,7 +1887,6 @@ Sda78:	cld
 
 	cmp	#$3c
 	bcc	.fwd6
-
 	cmp	#$3f
 	beq	.fwd6
 	cmp	#$7b
@@ -2008,7 +1981,7 @@ Sdafe:	jsr	Sf446
 	jmp	.fwd10
 
 .fwd2:	jsr	Sf5f9
-	lda	Z6b
+	lda	acc
 	beq	.loop1
 	jmp	.fwd10
 
@@ -2394,7 +2367,8 @@ interp_start:
 	jsr	Sdd3c
 	bcs	computer_inadequate
 .fwd2:	jsr	sl3fw
-Lddc4:	lda	Z01
+
+restart:	lda	Z01
 	ldx	Z03
 	sta	Ddd82
 	stx	Ddd83
@@ -2406,11 +2380,13 @@ Lddc4:	lda	Z01
 	sta	D057b
 	jsr	vtab
 	prt_msg_alt	story_loading
-	lda	#$00
-	ldx	#$56
+
+	lda	#$00		; clear interp zero page vars
+	ldx	#interp_zp_origin
 .loop2:	sta	Z00,x
 	inx
 	bne	.loop2
+
 	inc	Zeb
 	inc	Zed
 	inc	Zd4
@@ -2467,14 +2443,14 @@ Lde21:
 	sta	hdr_flags_1
 
 	lda	#iver>>8	; set interpreter number
-	sta	D121e
+	sta	hdr_interp_ver
 	lda	#$40+(iver&$ff)	; set interpreter version
-	sta	D121f
+	sta	hdr_interp_rev
 
 	lda	#24		; set screen dimensiosn
-	sta	D1220
+	sta	hdr_scr_height
 	lda	#80
-	sta	D1221
+	sta	hdr_scr_width
 
 	lda	hdr_globals
 	clc
@@ -2517,8 +2493,9 @@ Lde21:
 	ora	hdr_flags2+1
 	sta	hdr_flags2+1
 .fwd3:	jsr	home
+; fall into main loop
 
-inst_fetch:
+main_loop:
 	lda	#$00
 	sta	argcnt
 	ldy	Z7a
@@ -2531,19 +2508,18 @@ inst_fetch:
 	jsr	Sef2f
 .fwd4:	tay
 	sta	opcode
-	bmi	op_80_ff	; is opcode $80..$ff?
-	jmp	op_00_7f		;   no
+	bmi	op_80_ff
+	jmp	op_00_7f
 
-; opcode $80..$ff
 op_80_ff:
 	cmp	#$b0
 	bcs	op_b0_ff
 	jmp	op_80_af
 
 op_b0_ff:
-	cmp	#$c0		; is opcode $c0..$ff?
-	bcs	op_c0_ff	;   yes
-	jmp	op_b0_bf	;   no, $b0..$bf
+	cmp	#$c0
+	bcs	op_c0_ff
+	jmp	op_b0_bf
 
 ; opcode $c0..$ff: VAR format
 op_c0_ff:
@@ -2573,11 +2549,10 @@ op_c0_ff:
 .fwd3:	cmp	#$80
 	bne	Ldf08
 	jsr	Se089
-
 .fwd4:	ldx	Z6a
-	lda	Z6b
+	lda	acc
 	sta	arg1,x
-	lda	Z6b+1
+	lda	acc+1
 	sta	arg1+1,x
 	inc	argcnt
 	inx
@@ -2597,7 +2572,7 @@ Ldf11:	and	#$1f
 	lda	tab_var_hi,y
 	sta	Ldf20+2
 Ldf20	jsr	$ffff		; self-modifying code
-	jmp	inst_fetch
+	jmp	main_loop
 
 
 int_err_01:
@@ -2633,9 +2608,9 @@ op_ec:	jsr	Sef50
 	jsr	Se089
 
 .fwd3:	ldx	Z6a
-	lda	Z6b
+	lda	acc
 	sta	arg1,x
-	lda	Z6b+1
+	lda	acc+1
 	sta	arg1+1,x
 	inc	argcnt
 	inx
@@ -2659,7 +2634,7 @@ op_b0_bf:
 	lda	tab_0op_hi,y
 	sta	.jsr+2
 .jsr:	jsr	$ffff		; self-modifying code
-	jmp	inst_fetch
+	jmp	main_loop
 
 
 int_err_02:
@@ -2707,10 +2682,10 @@ op_80_af:
 	lda	tab_1op_hi,y
 	sta	Ldfea+2
 Ldfea:	jsr	$ffff		; self-modifying code
-	jmp	inst_fetch
+	jmp	main_loop
 
 
-; unreferenced?
+; unreferenced - was used in e.g. ZIP interpreter F
 int_err_03:
 	lda	#$03
 	jmp	int_error
@@ -2756,9 +2731,9 @@ Le01c:	lda	opcode
 	jmp	.fwd3
 
 .fwd2:	jsr	Se089
-	lda	Z6b
+	lda	acc
 	sta	arg2
-	lda	Z6b+1
+	lda	acc+1
 	sta	arg2+1
 .fwd3:	inc	argcnt
 Le04a:	lda	opcode
@@ -2769,7 +2744,7 @@ Le04a:	lda	opcode
 	lda	tab_2op_hi,y
 	sta	.jsr+2
 .jsr:	jsr	$ffff		; self-modifying code
-	jmp	inst_fetch
+	jmp	main_loop
 
 
 int_err_04:
@@ -2777,28 +2752,28 @@ int_err_04:
 	jmp	int_error
 
 
-Se066:	lda	Z6b
+Se066:	lda	acc
 	sta	arg1
-	lda	Z6b+1
+	lda	acc+1
 	sta	arg1+1
 	inc	argcnt
 	rts
 
 
 Se071:	lda	#$00
-	beq	Le078
+	beq	Le078		; always taken
 
 Se075:	jsr	Sef50
-Le078:	sta	Z6b+1
+Le078:	sta	acc+1
 	jsr	Sef50
-	sta	Z6b
+	sta	acc
 	rts
 
 
 Se080:	tax
 	bne	Le08e
 	jsr	op_pop
-	jmp	Le0dd
+	jmp	push_acc
 
 Se089:	jsr	Sef50
 	beq	op_pop
@@ -2806,17 +2781,18 @@ Le08e:	cmp	#$10
 	bcs	Le09f
 	asl
 	tax
-	lda	D1156-2,x
-	sta	Z6b
-	lda	D1156-1,x
-	sta	Z6b+1
+	lda	local_vars-2,x
+	sta	acc
+	lda	local_vars-1,x
+	sta	acc+1
 	rts
+
 Le09f:	jsr	Se14b
 	lda	(Z6d),y
-	sta	Z6b+1
+	sta	acc+1
 	iny
 	lda	(Z6d),y
-	sta	Z6b
+	sta	acc
 	rts
 
 
@@ -2831,17 +2807,17 @@ op_pop:	lda	Zeb
 	lda	Zeb+1
 	beq	.fwd3
 	lda	D0e56,y
-	sta	Z6b
+	sta	acc
 	tax
 	lda	D1056,y
-	sta	Z6b+1
+	sta	acc+1
 	rts
 
 .fwd3:	lda	D0d56,y
-	sta	Z6b
+	sta	acc
 	tax
 	lda	D0f56,y
-	sta	Z6b+1
+	sta	acc+1
 	rts
 
 
@@ -2850,11 +2826,13 @@ int_err_05:
 	jmp	int_error
 
 
-Le0dd:	ldx	Z6b
-	lda	Z6b+1
+push_acc:
+	ldx	acc
+	lda	acc+1
 
 ; push word in A:X onto data stack
-Se0e1:	pha
+push_ax:
+	pha
 	ldy	Zeb
 	lda	Zeb+1
 	beq	.fwd1
@@ -2893,33 +2871,44 @@ Le10d:	tax
 	bne	.fwd1
 	sta	Zeb+1
 .fwd1:	dec	Zeb
-	bne	Le0dd
+	bne	push_acc
 	ora	Zeb+1
 	beq	int_err_05
-	bne	Le0dd		; always taken
+	bne	push_acc	; always taken
 
-Le120:	lda	#$00
+
+; store a zero result into variable (or stack) designated by next byte of program
+store_result_zero:
+	lda	#$00
 	ldx	#$00
 
-Se124:	sta	Z6b
-	stx	Z6b+1
+; store result in X:A into acc and variable (or stack) designated by next byte of program
+store_result_xa:
+	sta	acc
+	stx	acc+1
 
-Se128:	jsr	Sef50
-	beq	Le0dd
+; store result in acc into variable (or stack) designated by next byte of program
+store_result:
+	jsr	Sef50
+	beq	push_acc
 Le12d:	cmp	#$10
 	bcs	.fwd2
+
+; store result in acc into local variable specified by A
 	asl
 	tax
-	lda	Z6b
-	sta	D1156-2,x
-	lda	Z6b+1
-	sta	D1156-1,x
+	lda	acc
+	sta	local_vars-2,x
+	lda	acc+1
+	sta	local_vars-1,x
 	rts
+
+; store result in acc into global variable specified by A (offset by $10)
 .fwd2:	jsr	Se14b
-	lda	Z6b+1
+	lda	acc+1
 	sta	(Z6d),y
 	iny
-	lda	Z6b
+	lda	acc
 	sta	(Z6d),y
 	rts
 
@@ -2938,24 +2927,28 @@ Se14b:	sec
 	sta	Z6e
 Le160:	rts
 
-Le161:	jsr	Sef50
+
+predicate_false:
+	jsr	Sef50
 	bpl	Le172
 Le166:	and	#$40
 	bne	Le160
 	jmp	Sef50
 
 
-Le16d:	jsr	Sef50
+predicate_true:
+	jsr	Sef50
 	bpl	Le166
 Le172:	tax
 	and	#$40
 	beq	.fwd1
 	txa
 	and	#$3f
-	sta	Z6b
+	sta	acc
 	lda	#$00
-	sta	Z6b+1
-	beq	.fwd3
+	sta	acc+1
+	beq	.fwd3		; always taken
+
 .fwd1:	txa
 	and	#$3f
 	tax
@@ -2964,12 +2957,12 @@ Le172:	tax
 	txa
 	ora	#$e0
 	tax
-.fwd2:	stx	Z6b+1
+.fwd2:	stx	acc+1
 	jsr	Sef50
-	sta	Z6b
-	lda	Z6b+1
+	sta	acc
+	lda	acc+1
 	bne	Le1a7
-.fwd3:	lda	Z6b
+.fwd3:	lda	acc
 	bne	.fwd4
 	jmp	op_rfalse
 
@@ -2977,11 +2970,11 @@ Le172:	tax
 	bne	Le1a7
 	jmp	op_rtrue
 
-Le1a7:	lda	Z6b
+Le1a7:	lda	acc
 	sec
 	sbc	#$02
 	tax
-	lda	Z6b+1
+	lda	acc+1
 	sbc	#$00
 	sta	Z6d
 	ldy	#$00
@@ -3015,13 +3008,13 @@ op_nop:	rts
 
 
 Se1e3:	lda	arg1
-	sta	Z6b
+	sta	acc
 	lda	arg1+1
-	sta	Z6b+1
+	sta	acc+1
 	rts
 
 
-; unreferenced?
+; unreferenced - see S1b1d in ZIP revision F
 Le1ec:	lda	hdr_flags2+1
 	ora	#$04
 	sta	hdr_flags2+1
@@ -3104,7 +3097,7 @@ Le1ec:	lda	hdr_flags2+1
 	optab_ent	int_err_04
 	optab_ent	int_err_04
 
-; VAR instructions (0-4 or 0-8 operands for call_vs2 and call_vn2), opcodes $e0..$ff
+; VAR instructions (0-4 operands, 0-8 for call_vs2 and call_vn2), opcodes $e0..$ff
 	optab_start	tab_var,32
 	optab_ent	op_call		; call_vs (call in Z-Machine v3 and earlier)
 	optab_ent	op_storew
@@ -3191,9 +3184,9 @@ op_verify:
 	bpl	.loop1
 	lda	#$40
 	sta	Z7b
-	lda	D121a
+	lda	hdr_length
 	sta	Z6e
-	lda	D121a+1
+	lda	hdr_length+1
 	asl
 	rol	Z6e
 	rol	Z71
@@ -3245,15 +3238,15 @@ op_verify:
 	lda	Z7d
 	cmp	Z71
 	bne	.loop2
-	lda	D121c+1
+	lda	hdr_checksum+1
 	cmp	Z73
 	bne	.fwd5
-	lda	D121c
+	lda	hdr_checksum
 	cmp	Z74
 	bne	.fwd5
-	jmp	Le16d
+	jmp	predicate_true
 
-.fwd5:	jmp	Le161
+.fwd5:	jmp	predicate_false
 
 	if	iver>=iver2b
 msg_be_patient:
@@ -3267,43 +3260,44 @@ msg_len_be_patient	equ	*-msg_be_patient
 op_jz:	lda	arg1
 	ora	arg1+1
 	beq	Le394
-Le36c:	jmp	Le161
+Le36c:	jmp	predicate_false
 
 
 op_get_sibling:
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$08
-	bne	Le383
+	bne	Le383		; always taken
+
 
 op_get_child:
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0a
 Le383:	lda	(Z6d),y
 	tax
 	iny
 	lda	(Z6d),y
-	jsr	Se124
-	lda	Z6b
+	jsr	store_result_xa
+	lda	acc
 	bne	Le394
-	lda	Z6b+1
+	lda	acc+1
 	beq	Le36c
-Le394:	jmp	Le16d
+Le394:	jmp	predicate_true
 
 
 op_get_parent:
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$06
 	lda	(Z6d),y
 	tax
 	iny
 	lda	(Z6d),y
-	jmp	Se124
+	jmp	store_result_xa
 
 
 op_get_prop_len:
@@ -3328,26 +3322,26 @@ op_get_prop_len:
 	bne	.fwd4
 .fwd3:	and	#$3f
 .fwd4:	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
 
 op_inc:	lda	arg1
 	jsr	Se080
-	inc	Z6b
+	inc	acc
 	bne	.fwd1
-	inc	Z6b+1
+	inc	acc+1
 .fwd1:	jmp	Le3f4
 
 
 op_dec:	lda	arg1
 	jsr	Se080
-	lda	Z6b
+	lda	acc
 	sec
 	sbc	#$01
-	sta	Z6b
-	lda	Z6b+1
+	sta	acc
+	lda	acc+1
 	sbc	#$00
-	sta	Z6b+1
+	sta	acc+1
 Le3f4:	lda	arg1
 	jmp	Le10d
 
@@ -3364,7 +3358,7 @@ op_print_addr:
 op_remove_obj:
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	lda	Z6d
 	sta	Z6f
 	lda	Z6e
@@ -3379,7 +3373,7 @@ op_remove_obj:
 	ora	(Z6d),y
 	beq	.rtn
 	lda	Z71
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0a
 	lda	(Z6d),y
 	tax
@@ -3400,7 +3394,7 @@ op_remove_obj:
 	iny
 	sta	(Z6d),y
 	bne	.fwd1
-.loop1:	jsr	Sf1af
+.loop1:	jsr	setup_object
 	ldy	#$08
 	lda	(Z6d),y
 	tax
@@ -3431,7 +3425,7 @@ op_remove_obj:
 op_print_obj:
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0c
 	lda	(Z6d),y
 	tax
@@ -3458,15 +3452,17 @@ op_ret:	lda	Zed
 	txa
 	asl
 	sta	Z6d
+
 .loop1:	jsr	op_pop
 	ldy	Z6d
-	sta	D1157,y
+	sta	local_vars+1,y
 	txa
-	sta	D1156,y
+	sta	local_vars,y
 	dec	Z6d
 	dec	Z6d
 	dec	Z6e
 	bne	.loop1
+
 .fwd1:	jsr	op_pop
 	stx	pc+1
 	sta	pc+2
@@ -3477,7 +3473,7 @@ op_ret:	lda	Zed
 	sta	Zed+1
 	jsr	Sedc1
 	jsr	Se1e3
-Le4db:	jmp	Se128		; self-modifying code - jmp target changed by code at Sf5f9 and Lf67c
+Le4db:	jmp	store_result	; self-modifying code - jmp target changed by code at Sf5f9 and Lf67c
 
 
 op_jump:
@@ -3497,7 +3493,7 @@ op_print_paddr:
 op_load:
 	lda	arg1
 	jsr	Se080
-	jmp	Se128
+	jmp	store_result
 
 
 op_not:	lda	arg1
@@ -3505,9 +3501,13 @@ op_not:	lda	arg1
 	tax
 	lda	arg1+1
 	eor	#$ff
-Le503:	stx	Z6b
-	sta	Z6b+1
-	jmp	Se128
+; fall into store_result_ax
+
+; store result in A:X into variable (or stack) designated by next byte of program
+store_result_ax:
+	stx	acc
+	sta	acc+1
+	jmp	store_result
 
 
 op_jl:	jsr	Se1e3
@@ -3532,33 +3532,35 @@ op_jg:	lda	arg1
 
 op_inc_chk:
 	jsr	op_inc
-	lda	Z6b
+	lda	acc
 	sta	Z6d
-	lda	Z6b+1
+	lda	acc+1
 	sta	Z6e
 Le534:	lda	arg2
-	sta	Z6b
+	sta	acc
 	lda	arg2+1
-	sta	Z6b+1
+	sta	acc+1
 Le53c:	lda	Z6e
-	eor	Z6b+1
+	eor	acc+1
 	bpl	.fwd1
 	lda	Z6e
-	cmp	Z6b+1
+	cmp	acc+1
 	bcc	Le583
-	jmp	Le161
-.fwd1:	lda	Z6b+1
+	jmp	predicate_false
+
+.fwd1:	lda	acc+1
 	cmp	Z6e
 	bne	.fwd2
-	lda	Z6b
+	lda	acc
 	cmp	Z6d
 .fwd2:	bcc	Le583
-	jmp	Le161
+	jmp	predicate_false
 
 
+; is object ARG1 in object ARG2?
 op_jin:	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$06
 	lda	(Z6d),y
 	cmp	arg2+1
@@ -3567,7 +3569,7 @@ op_jin:	lda	arg1
 	lda	(Z6d),y
 	cmp	arg2
 	beq	Le583
-Le570:	jmp	Le161
+Le570:	jmp	predicate_false
 
 
 op_test:
@@ -3579,14 +3581,14 @@ op_test:
 	and	arg1+1
 	cmp	arg2+1
 	bne	Le570
-Le583:	jmp	Le16d
+Le583:	jmp	predicate_true
 
 op_or:	lda	arg1
 	ora	arg2
 	tax
 	lda	arg1+1
 	ora	arg2+1
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_and:	lda	arg1
@@ -3594,11 +3596,11 @@ op_and:	lda	arg1
 	tax
 	lda	arg1+1
 	and	arg2+1
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_test_attr:
-	jsr	Sf240
+	jsr	setup_attribute
 	lda	Z72
 	and	Z70
 	sta	Z72
@@ -3606,11 +3608,11 @@ op_test_attr:
 	and	Z6f
 	ora	Z72
 	bne	Le583
-	jmp	Le161
+	jmp	predicate_false
 
 
 op_set_attr:
-	jsr	Sf240
+	jsr	setup_attribute
 	ldy	#$00
 	lda	Z72
 	ora	Z70
@@ -3623,7 +3625,7 @@ op_set_attr:
 
 
 op_clear_attr:
-	jsr	Sf240
+	jsr	setup_attribute
 	ldy	#$00
 	lda	Z70
 	eor	#$ff
@@ -3639,9 +3641,9 @@ op_clear_attr:
 
 op_store:
 	lda	arg2
-	sta	Z6b
+	sta	acc
 	lda	arg2+1
-	sta	Z6b+1
+	sta	acc+1
 	lda	arg1
 	jmp	Le10d
 
@@ -3650,7 +3652,7 @@ op_insert_obj:
 	jsr	op_remove_obj
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	lda	Z6d
 	sta	Z6f
 	lda	Z6e
@@ -3662,7 +3664,7 @@ op_insert_obj:
 	lda	arg2
 	iny
 	sta	(Z6d),y
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0a
 	lda	(Z6d),y
 	sta	Z72
@@ -3688,10 +3690,10 @@ op_insert_obj:
 op_loadw:
 	jsr	Se643
 	jsr	Sef3b
-Le632:	sta	Z6b+1
+Le632:	sta	acc+1
 	jsr	Sef3b
-	sta	Z6b
-	jmp	Se128
+	sta	acc
+	jmp	store_result
 
 
 op_loadb:
@@ -3731,11 +3733,11 @@ op_get_prop:
 	asl
 	tay
 	lda	(Z89),y
-	sta	Z6b+1
+	sta	acc+1
 	iny
 	lda	(Z89),y
-	sta	Z6b
-	jmp	Se128
+	sta	acc
+	jmp	store_result
 
 .fwd2:	jsr	Sf206
 	iny
@@ -3743,6 +3745,7 @@ op_get_prop:
 	beq	.fwd3
 	cmp	#$02
 	beq	.fwd4
+
 	lda	#$07
 	jmp	int_error
 
@@ -3754,9 +3757,9 @@ op_get_prop:
 	tax
 	iny
 	lda	(Z6d),y
-.fwd5:	sta	Z6b
-	stx	Z6b+1
-	jmp	Se128
+.fwd5:	sta	acc
+	stx	acc+1
+	jmp	store_result
 
 
 op_get_prop_addr:
@@ -3776,7 +3779,7 @@ op_get_prop_addr:
 
 	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0c
 	lda	(Z6d),Y
 	clc
@@ -3853,14 +3856,15 @@ op_get_prop_addr:
 	tya
 	clc
 	adc	Z6d
-	sta	Z6b
+	sta	acc
 	lda	Z6e
 	adc	#$00
 	sec
 	sbc	Z81
-	sta	Z6b+1
-	jmp	Se128
-Le6ce:	jmp	Le120
+	sta	acc+1
+	jmp	store_result
+
+Le6ce:	jmp	store_result_zero
 
 
 op_get_next_prop:
@@ -3877,7 +3881,7 @@ op_get_next_prop:
 .fwd1:	jsr	Sf21e
 .fwd2:	jsr	Sf201
 	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
 
 op_add:
@@ -3887,7 +3891,7 @@ op_add:
 	tax
 	lda	arg1+1
 	adc	arg2+1
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_sub:
@@ -3897,7 +3901,7 @@ op_sub:
 	tax
 	lda	arg1+1
 	sbc	arg2+1
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_mul:	jsr	Se7c6
@@ -3917,24 +3921,24 @@ op_mul:	jsr	Se7c6
 	bpl	.loop1
 	ldx	arg2
 	lda	arg2+1
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_div:
-	jsr	Se744
+	jsr	divide
 	ldx	Zc7
 	lda	Zc8
-	jmp	Le503
+	jmp	store_result_ax
 
 
 op_mod:
-	jsr	Se744
+	jsr	divide
 	ldx	Zc9
 	lda	Zca
-	jmp	Le503
+	jmp	store_result_ax
 
 
-Se744:	lda	arg1+1
+divide:	lda	arg1+1
 	sta	Zce
 	eor	arg2+1
 	sta	Zcd
@@ -4028,22 +4032,22 @@ op_je:	dec	argcnt
 	cmp	arg2
 	bne	.fwd2
 	cpx	arg2+1
-	beq	.fwd4
+	beq	.rtn_t
 .fwd2:	dec	argcnt
-	beq	.fwd5
+	beq	.rtn_f
 	cmp	arg3
 	bne	.fwd3
 	cpx	arg3+1
-	beq	.fwd4
+	beq	.rtn_t
 .fwd3:	dec	argcnt
-	beq	.fwd5
+	beq	.rtn_f
 	cmp	arg4
-	bne	.fwd5
+	bne	.rtn_f
 	cpx	arg4+1
-	bne	.fwd5
-.fwd4:	jmp	Le16d
+	bne	.rtn_f
+.rtn_t:	jmp	predicate_true
 
-.fwd5:	jmp	Le161
+.rtn_f:	jmp	predicate_false
 
 
 op_call:
@@ -4051,16 +4055,16 @@ op_call:
 	ora	arg1+1
 	bne	.fwd1
 	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
 .fwd1:	ldx	Zed
 	lda	Zed+1
-	jsr	Se0e1
+	jsr	push_ax
 	lda	pc
-	jsr	Se0e1
+	jsr	push_ax
 	ldx	pc+1
 	lda	pc+2
-	jsr	Se0e1
+	jsr	push_ax
 	lda	#$00
 	asl	arg1
 	rol	arg1+1
@@ -4081,66 +4085,76 @@ op_call:
 	lda	#$00
 	sta	Z6d
 .loop1:	ldy	Z6d
-	ldx	D1156,y
-	lda	D1157,y
-	jsr	Se0e1
+	ldx	local_vars,y
+	lda	local_vars+1,y
+	jsr	push_ax
 	jsr	Sef50
 	sta	Z6e
 	jsr	Sef50
 	ldy	Z6d
-	sta	D1156,y
+	sta	local_vars,y
 	lda	Z6e
-	sta	D1157,y
+	sta	local_vars+1,y
 	iny
 	iny
 	sty	Z6d
 	dec	Z6f
 	bne	.loop1
+
+; if present, copy arg2 through arg8 to the first local variables
 .fwd2:	dec	argcnt
 	beq	.fwd3
+
 	lda	arg2
-	sta	D1156
+	sta	local_vars
 	lda	arg2+1
-	sta	D1157
+	sta	local_vars+1
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg3
-	sta	D1158
+	sta	local_vars+2
 	lda	arg3+1
-	sta	D1159
+	sta	local_vars+3
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg4
-	sta	D115a
+	sta	local_vars+4
 	lda	arg4+1
-	sta	D115b
+	sta	local_vars+5
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg5
-	sta	D115c
+	sta	local_vars+6
 	lda	arg5+1
-	sta	D115c+1
+	sta	local_vars+7
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg6
-	sta	D115e
+	sta	local_vars+8
 	lda	arg6+1
-	sta	D115f
+	sta	local_vars+9
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg7
-	sta	D1160
+	sta	local_vars+10
 	lda	arg7+1
-	sta	D1161
+	sta	local_vars+11
 	dec	argcnt
 	beq	.fwd3
+
 	lda	arg8
-	sta	D1162
+	sta	local_vars+12
 	lda	arg8+1
-	sta	D1163
+	sta	local_vars+13
+
 .fwd3:	ldx	Z70
 	txa
-	jsr	Se0e1
+	jsr	push_ax
 	lda	Zeb+1
 	sta	Zed+1
 	lda	Zeb
@@ -4259,7 +4273,7 @@ op_random:
 	bne	.fwd1
 	sta	Ze8
 	sta	Ze8+1
-	jmp	Le120
+	jmp	store_result_zero
 
 .fwd1:	lda	Ze8
 	ora	Ze8+1
@@ -4285,15 +4299,15 @@ op_random:
 	stx	arg1
 	and	#$7f
 	sta	arg1+1
-	jsr	Se744
+	jsr	divide
 	lda	Zc9
 	clc
 	adc	#$01
-	sta	Z6b
+	sta	acc
 	lda	Zca
 	adc	#$00
-	sta	Z6b+1
-	jmp	Se128
+	sta	acc+1
+	jmp	store_result
 
 .fwd3:
 	if	iver>=iver2b
@@ -4315,19 +4329,19 @@ op_random:
 	lda	#$00
 	sta	Zc1
 .fwd4:	lda	Zc0
-	sta	Z6b
+	sta	acc
 	lda	Zc1
-	sta	Z6b+1
+	sta	acc+1
 	inc	Zc0
 	bne	.fwd5
 	inc	Zc1
-.fwd5:	jmp	Se128
+.fwd5:	jmp	store_result
 
 
 op_push:
 	ldx	arg1
 	lda	arg1+1
-	jmp	Se0e1
+	jmp	push_ax
 
 
 op_pull:
@@ -4369,17 +4383,17 @@ op_scan_table:
 	sta	Z7b
 	bcs	.fwd3
 	dec	Z7c
-.fwd3:	sta	Z6b
+.fwd3:	sta	acc
 	lda	Z7c
-	sta	Z6b+1
-	jsr	Se128
-	jmp	Le16d
+	sta	acc+1
+	jsr	store_result
+	jmp	predicate_true
 
 .fwd4:	lda	#$00
-	sta	Z6b
-	sta	Z6b+1
-	jsr	Se128
-	jmp	Le161
+	sta	acc
+	sta	acc+1
+	jsr	store_result
+	jmp	predicate_false
 
 
 op_sread:
@@ -4495,10 +4509,10 @@ op_sread:
 	jsr	Seb30
 	ldy	#$00
 	sty	Za0
-	lda	Z6b+1
+	lda	acc+1
 	sta	(Za1),y
 	iny
-	lda	Z6b
+	lda	acc
 	sta	(Za1),y
 	lda	Z9e
 	clc
@@ -4765,14 +4779,14 @@ Seb96:	lda	hdr_vocab
 .fwd8:	jmp	.loop3
 
 .fwd9:	lda	#$00
-	sta	Z6b
-	sta	Z6b+1
+	sta	acc
+	sta	acc+1
 	rts
 
 .fwd10:	lda	Z70
-	sta	Z6b
+	sta	acc
 	lda	Z71
-	sta	Z6b+1
+	sta	acc+1
 	rts
 
 
@@ -4799,9 +4813,9 @@ Ded11:	fcb	$00
 Ded12:	fcb	$00
 
 
-Led13:	lda	D121a+1
+Led13:	lda	hdr_length+1
 	sta	Z6f
-	lda	D121a
+	lda	hdr_length
 	ldy	#$05
 .loop1:	lsr
 	ror	Z6f
@@ -5564,13 +5578,17 @@ Lf15c:	lda	Z95
 	rts
 
 
-Df195:	fcb	$00,$0d,$30,$31,$32,$33,$34,$35	; "..012345"
-	fcb	$36,$37,$38,$39,$2e,$2c,$21,$3f	; "6789.,!?"
-	fcb	$5f,$23,$27,$22,$2f,$5c,$2d,$3a	; "_#'"/\-:"
-	fcb	$28,$29                  	; "()"
+Df195:	fcb	$00,char_cr
+	fcb	"0123456789"
+	fcb	".,!?_#'"
+	fcb	$22		; double quote
+	fcb	"/"
+	fcb	"\\"		; this is a single backslash, escaped
+	fcb	"-:()"
 
 
-Sf1af:	stx	Z6e
+setup_object:
+	stx	Z6e
 	asl
 	sta	Z6d
 	rol	Z6e
@@ -5604,7 +5622,7 @@ Sf1af:	stx	Z6e
 
 Sf1e3:	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	ldy	#$0c
 	lda	(Z6d),y
 	clc
@@ -5669,9 +5687,10 @@ Sf230:	jsr	Sf21e
 	rts
 
 
-Sf240:	lda	arg1
+setup_attribute:
+	lda	arg1
 	ldx	arg1+1
-	jsr	Sf1af
+	jsr	setup_object
 	lda	arg2
 	cmp	#$10
 	bcc	.fwd3
@@ -5724,12 +5743,15 @@ msg_internal_error:
 Df2a4:	text_str	"00.  "
 msg_len_internal_error	equ	*-msg_internal_error
 
+
+; On entry:
+;   A = error number
 int_error:
-	ldy	#$01
-.loop1:	ldx	#$00
-.loop2:	cmp	#$0a
+	ldy	#$01		; divide by 10, storing into message
+.loop1:	ldx	#0
+.loop2:	cmp	#10
 	bcc	.fwd1
-	sbc	#$0a
+	sbc	#10
 	inx
 	bne	.loop2
 .fwd1:	ora	#$30
@@ -5747,7 +5769,7 @@ Lf2ce:	prt_msg	end_of_session
 	jmp	*		; deliberately hang
 
 
-msg_end_of_session
+msg_end_of_session:
 	text_str	"End of session."
 	fcb	char_cr
 msg_len_end_of_session	equ	*-msg_end_of_session
@@ -5761,10 +5783,10 @@ op_restart:
 	dex
 	stx	Ddc34
 .fwd1:	jsr	Sd856
-	jmp	Lddc4
+	jmp	restart
 
 
-; unreferenced?
+; Unreferenced? See S14dc in ZIP revision F
 Sf2fc:	lda	#$fb
 	rts
 
@@ -5804,7 +5826,7 @@ Sf311:	sta	Zd7
 	bne	.fwd3
 	jmp	op_new_line
 
-.fwd3:	cmp	#$20
+.fwd3:	cmp	#' '
 	bcc	.rtn
 	ldx	invflg
 	bpl	.fwd4
@@ -6273,15 +6295,15 @@ op_read_char:
 	ora	Z70
 	beq	.fwd3
 	jsr	Sf5f9
-	lda	Z6b
+	lda	acc
 	bne	.fwd3
 	beq	.loop1		; always taken
 
 .fwd2:	jsr	Sda78
 	ldx	#$00
-	jmp	Se124
+	jmp	store_result_xa
 
-.fwd3:	jmp	Le120
+.fwd3:	jmp	store_result_zero
 
 
 Sf5f9:	lda	#Lf67c>>8
@@ -6296,12 +6318,12 @@ Sf5f9:	lda	#Lf67c>>8
 	pha
 	ldx	Zed
 	lda	Zed+1
-	jsr	Se0e1
+	jsr	push_ax
 	lda	pc
-	jsr	Se0e1
+	jsr	push_ax
 	ldx	pc+1
 	lda	pc+2
-	jsr	Se0e1
+	jsr	push_ax
 	lda	#$00
 	asl	Z6f
 	rol	Z70
@@ -6322,16 +6344,16 @@ Sf5f9:	lda	#Lf67c>>8
 	lda	#$00
 	sta	Z6d
 .loop1:	ldy	Z6d
-	ldx	D1156,y
-	lda	D1157,y
-	jsr	Se0e1
+	ldx	local_vars,y
+	lda	local_vars+1,y
+	jsr	push_ax
 	jsr	Sef50
 	sta	Z6e
 	jsr	Sef50
 	ldy	Z6d
-	sta	D1156,y
+	sta	local_vars,y
 	lda	Z6e
-	sta	D1157,y
+	sta	local_vars+1,y
 	iny
 	iny
 	sty	Z6d
@@ -6339,17 +6361,17 @@ Sf5f9:	lda	#Lf67c>>8
 	bne	.loop1
 .fwd1:	ldx	Z70
 	txa
-	jsr	Se0e1
+	jsr	push_ax
 	lda	Zeb
 	sta	Zed
 	lda	Zeb+1
 	sta	Zed+1
-	jmp	inst_fetch
+	jmp	main_loop
 
 
-Lf67c:	lda	#Se128>>8
+Lf67c:	lda	#store_result>>8
 	sta	Le4db+2
-	lda	#Se128&$ff
+	lda	#store_result&$ff
 	sta	Le4db+1
 	pla
 	pla
