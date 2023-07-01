@@ -6,6 +6,7 @@ all: zip1.lst  zip1.bin  zip1-check \
      zip3f.lst zip3f.bin zip3f-check \
      zip3h.lst zip3h.bin zip3h-check \
      zip3k.lst zip3k.bin zip3k-check \
+     zip3m.lst zip3m.bin zip3m-check \
      ezip2a.lst ezip2a.bin ezip2a-check \
      ezip2b.lst ezip2b.bin ezip2b-check \
      ezip2c.lst ezip2c.bin ezip2c-check \
@@ -95,6 +96,16 @@ zip3k.bin: zip3k.p
 
 zip3k-check: zip3k.bin
 	echo "0fd531fb0366bff94fdc1e4e95fee8ca77d2a513d3dbb5ddc4fd518acbeb0c60 zip3k.bin" | sha256sum -c -
+
+
+zip3m.p zip3m.lst: zip-late.asm
+	asl zip-late.asm -o zip3m.p -L -OLIST zip3m.lst -D iver='$$030d'
+
+zip3m.bin: zip3m.p
+	p2bin -r '$$0900-$$27ff' zip3m.p
+
+zip3m-check: zip3m.bin
+	echo "e9f42d7f2ea8b8cd942a95abc11a90a46d69fa4dd3102bd1ec35bb9cfd3f9a97 zip3m.bin" | sha256sum -c -
 
 
 ezip2a.p ezip2a.lst: ezip.asm

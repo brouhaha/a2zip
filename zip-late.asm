@@ -17,9 +17,13 @@ iver3h	equ	$0308	; Sends 80-col sequence to printer firmware.
 			; Quit says end of session rather than end of story.
 			; Doesn't use self-modifying code for verify.
 
-iver3k	equ	$030b
+iver3k	equ	$030b	; Disk routines rearranged.
+			; Forces CSWL to be COUT at start.
 
-iver3m	equ	$030d
+iver3m	equ	$030d	; Eliminated some manipulation of the screen window
+			; in save and restore.
+			; Fixed a bug in upper/lower case conversion.
+
 
 
 	ifndef	iver
@@ -1069,6 +1073,8 @@ int_err_0e_alt:
 
 
 e_0dd9:	jsr	op_new_line
+
+	if	iver<=iver3k
 	lda	#$00
 	sta	wndtop
 	jsr	home
@@ -1078,6 +1084,14 @@ e_0dd9:	jsr	op_new_line
 	sta	cur80h
 	sta	cursrv
 	jmp	S144e
+
+	else
+
+	lda	#$00
+	sta	Zdf
+	rts
+
+	endif
 
 
 msg_default_is:	text_str	" (Default is "
@@ -1350,8 +1364,11 @@ msg_len_saving_position	equ	*-msg_saving_position
 
 
 op_save:
+	if	iver<=iver3k
 	lda	wndtop
 	pha
+	endif
+
 	jsr	e_0dd9
 	prt_msg	save_position
 	jsr	S0e91
@@ -1377,9 +1394,13 @@ op_save:
 	bcc	.fwd1
 
 .loop2:	jsr	S0ff8
+
+	if	iver<=iver3k
 	pla
 	sta	wndtop
 	jsr	home
+	endif
+
 	jmp	predicate_false
 
 .fwd1:	lda	#(hdr_arch>>8)-3
@@ -1408,9 +1429,12 @@ op_save:
 	sta	Zf0
 	endif
 
+	if	iver<=iver3k
 	pla
 	sta	wndtop
 	jsr	home
+	endif
+
 	jmp	predicate_true
 
 
@@ -1429,8 +1453,11 @@ msg_len_restoring_position	equ	*-msg_restoring_position
 
 
 op_restore:
+	if	iver<=iver3k
 	lda	wndtop
 	pha
+	endif
+
 	jsr	e_0dd9
 	prt_msg	restore_position
 	jsr	S0e91
@@ -1460,9 +1487,13 @@ op_restore:
 	bpl	.loop3
 
 	jsr	S0ff8
+
+	if	iver<=iver3k
 	pla
 	sta	wndtop
 	jsr	home
+	endif
+
 	jmp	predicate_false
 
 .fwd1:	lda	hdr_flags2
@@ -1515,9 +1546,12 @@ op_restore:
 	sta	Zf0
 	endif
 
+	if	iver<=iver3k
 	pla
 	sta	wndtop
 	jsr	home
+	endif
+
 	jmp	predicate_true
 
 
@@ -1663,9 +1697,21 @@ S1275:	sta	Ze2
 	tya
 	pha
 	lda	Ze2
+
+	if	iver<=iver3k
 	cmp	#$60
+	else
+	cmp	#$61
+	endif
+
 	bcc	.fwd1
+
+	if	iver<=iver3k
 	cmp	#$80
+	else
+	cmp	#$7b
+	endif
+
 	bcs	.fwd1
 	ldx	D172b
 	bne	.fwd1
