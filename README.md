@@ -65,10 +65,11 @@ Revision B added support for splitting the screen into two windows.
 
 ## Later ZIP interpreters
 
-Between Revision B and revision F of the Apple II ZIP interpreters, a
+Between revision B and revision F of the Apple II ZIP interpreters, a
 substantial rearrangement of the code occurred. These and later changes
-to the v3 interpreter have not yet been fully analyzed, and are not currently
-represented here.
+to the v3 interpreter have not yet been fully analyzed.
+
+Currently revision F can be built from the source file "zip-late.asm".
 
 The disk I/O routines are derived from RWTS but no longer
 structured in the same way as RWTS, and are now more tightly integrated with
