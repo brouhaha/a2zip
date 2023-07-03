@@ -6092,6 +6092,12 @@ new_line:
 	bne	.fwd2
 	lda	wndtop
 	sta	Zda
+
+	if	iver>=iver_c
+	inc	Zda
+	inc	Zda
+	endif
+
 	bit	kbd_strb
 	lda	hdr_unknown_29
 	sta	D057b
@@ -6586,7 +6592,11 @@ Sfada:	jsr	Sf8e1
 	sta	Dfdf0
 	ldy	wndtop
 	sty	Zda
+
+	if	iver==iver_a
 	inc	Zda
+	endif
+
 	tay
 	lda	(Zc8),y
 	cmp	#$4f
@@ -6614,7 +6624,13 @@ Sfada:	jsr	Sf8e1
 	beq	.fwd10
 	jmp	.fwd11
 
-.fwd4:	cmp	#$0d
+.fwd4:
+	if	iver>=iver_c
+	tay
+	bmi	.fwd9
+	endif
+
+	cmp	#$0d
 	beq	.fwd10
 	cmp	#$7f
 	beq	.fwd8
@@ -6658,6 +6674,11 @@ Sfada:	jsr	Sf8e1
 .fwd10:	sta	Dfdf0
 	lda	#$8d
 	jsr	Sdb39
+
+	if	iver>=iver_c
+	inc	Zda
+	endif
+
 	lda	Zd9
 	beq	.fwd11
 	lda	hdr_flags2+1
@@ -6845,6 +6866,11 @@ op_read_char:
 	jsr	Sf8e1
 	lda	wndtop
 	sta	Zda
+
+	if	iver>=iver_c
+	inc	Zda
+	endif
+
 	lda	#$00
 	sta	Zd6
 	sta	Z6e
