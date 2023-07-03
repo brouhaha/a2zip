@@ -13,8 +13,8 @@ interpreted on a ZIP interpreter. ZIP interpreters were written for
 many computers, including the Apple II. In 1983 to 1984 I reverse-engineered
 a substantial portion of the Apple II version 1 through 3 ZIP interpreters.
 
-More recently I've partially reverse-engineered a few newer Apple II ZIP and
-EZIP interpreters.
+More recently I've partially reverse-engineered a few newer Apple II
+ZIP, EZIP, and XZIP interpreters.
 
 The reverse-engineered "source code" cross-assembles using the
 Macro Assembler AS, which is open source and supports common development
@@ -63,7 +63,7 @@ printer interface card, which previously was required to be slot 1.
 
 Revision B added support for splitting the screen into two windows.
 
-## Later ZIP interpreters
+## Later ZIP interpreter revisions
 
 Between revision B and revision F of the Apple II ZIP interpreters, a
 substantial rearrangement of the code occurred.
@@ -75,16 +75,19 @@ with the interpreter.
 Currently revisions F, H, K, and M can be built from the source file
 "zip-late.asm".
 
-
 ## EZIP
 
 Z-Machine architecture v4 doubled the available virtual machine memory size
 to 256 KiB, allowed a game to have more objects, allowed vocabulary words to
 have up to nine significant characters, and added some improvements to I/O
-capabilities. The v4 interpreters are known as EZIP. There were five
-revisions of the Apple II EZIP interpreter, designated 2A through 2D, and 2H.
-These interpeters require an Apple IIe, IIc, IIC+, or IIgs with at least
-128 KiB of RAM.
+capabilities. The v4 interpreters are known as EZIP.
+
+There were five revisions of the Apple II EZIP interpreter, designated
+2A through 2D, and 2H.  The numric character, 2 is a platform
+identifier, referencing the Apple II family, while the alphabetic
+character is the revision of the interpreter for that platform.  These
+interpeters require an Apple IIe, IIc, IIC+, or IIgs with at least 128
+KiB of RAM.
 
 As with later Apple II ZIP interpreter versions, the disk routines are more
 tightly integrated with the interpreter. In EZIP (and the later XZIP),
@@ -97,11 +100,25 @@ Roland Gustafsson's RWTS18.
 Early work on reverse-engineering these is present in the source file
 "ezip.asm". This does not use an include file for macro definitions.
 
-## XZIP and YZIP
+## XZIP
 
-Eventually Infocom added even more capabilities, resulting in Z-Machine
-architectures 5 and 6, with interpreters known as XZIP and YZIP.
-These are not currently represented here.
+The Z-Machine architecture v5 added support for character-cell graphics and
+timed input. The v5 interpreters are known as XZIP.
+
+There were five revisions of the Apple II XZIP interpreter, A, C, E,
+F, and H. The platform number will be reported as 2, except when using
+an Apple IIc, which will be reported as 9.
+
+Early work on reverse-engineering XZIP interpreter revision A is
+present in the source file "ezip.asm". This does not use an include
+file for macro definitions.
+
+## YZIP
+
+Eventually Infocom added graphics and mouse support, resulting in
+Z-Machine architectures 6, with the interpreter known as YZIP.
+
+YZIP is not currently represented here.
 
 ## Archive of earliest reverse-engineered source files
 

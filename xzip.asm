@@ -9,48 +9,36 @@
 
 ; The differences between revisions stated here is not comprehensizve.
 
-iver2a	equ	$0201		; Has exactly four save positions per disk, will only
-				; work for games that have up to 32 KiB saves.
-				; Released with A Mind Forever Voyaging r77 850814
+iver_a	equ	$0501	; Released with:
+			;    Beyond Zork r49 870917
 
-iver2b	equ	$0202		; Allows disks to have three or four save positions,
-				; supporting games with up to 46 KiB saves.
-				; Forces CSWL to be COUT1 at start.
-				; Adds "be patient" message to verify.
-				; Radically changes implementation of get_prop_addr,
-				; purpose unknown.
-				; Changes random number generator, purpose unknown.
-				; Changes subroutine Seb96, purpose unknown.
-				; Changes some constants in save and restore,
-				; purpose unknown.
-				; Released with Trinity r11 860509
+iver_c	equ	$0503	; Released with:
+			;    Border Zone r9 871008
 
-iver2c	equ	$0203		; Changes deselecting output stream 3
-				; (table), to prevent table stream stack underflow.
-				; Changes data tables used by random number generator,
-				; purpose unknown.
-				; Released with Bureaucracy r86 870212
+iver_e	equ	$0503	; Released with:
+			;    Hitchhiker's Guide to the Galaxy
+			;        (Solid Gold) r31 871119
+			;    Zork I (Solid Gold) r52 871125
 
-iver2d	equ	$0204		; Changes spaces to tabs in save messages (probably
-				; by mistake).
-				; Changes a constant in scan_table, purpose unknown.
-				; Released with Bureaucracy r116 870602
+iver_f	equ	$0506	; Released with:
+			;    Sherlock r21 871214
+			;    Beyond Zork r57 871221
 
-; No Apple II games with EZIP versions 2E through 2G have been found
-
-iver2h	equ	$0208		; Removes several calls to HOME.
-				; Changes the tabs in messages back to spaces.
-				; Adds two extra carriage returns at the end of
-				; some messages.
-			 	; Released with Nord and Bert r19 870723
+iver_h	equ	$0508	; Released with:
+			;    Sherlock r26 880127 (need to verify interpreter)
+			;    Leather Goddesses of Phobos
+			;        (Solid Gold) r4 880405
+			;    Planetfall (Solid Gold) r10 880531
+			;    Wishbringer (Sold Gold) r23 880706
 
 
 char_tab	equ	$09
 char_cr		equ	$0d
+char_del	equ	$7f
 
 
 	ifndef	iver
-iver	equ	iver2a
+iver	equ	iver_a
 	endif
 
 
@@ -64,24 +52,11 @@ size	set	256
 	endm
 	endm
 
-	if	iver==iver2a
-
-; EZIP 2A sets the high bit of interpreter message strings
-; macro for text string
-text_str	macro	arg
-	irpc	char,arg
-	fcb	'char'+$80
-	endm
-	endm
-	else
-
-; EZIP 2B and later do NOT set the high bit of interpreter message strings
-; macro for text string
+; A macro is used for text string beause different versions
+; of EZIP used the high bit set or not.
 text_str	macro	arg
 	fcb	arg
 	endm
-
-	endif
 
 ; macro to print a message
 prt_msg	macro	name
@@ -144,7 +119,7 @@ optab_idx	set	optab_idx+1
 
 
 ; disk zero page variables
-		org	$00
+		org	$0000
 
 Z00:		rmb	1
 Z01:		rmb	1
@@ -174,7 +149,6 @@ Z1a:		rmb	1
 
 
 ; Apple II zero page locations
-wndwdt	equ	$21
 wndtop	equ	$22
 wndbot	equ	$23
 cursrh	equ	$24
@@ -221,7 +195,7 @@ pc_phys_page:	rmb	3	; physical address of page holding current PC
 				; third byte is 0/1 for page in main/aux RAM
 
 aux_ptr:	rmb	3
-aux_phys_page:	rmb	3	; physical address of page holding current PC
+aux_phys_page:	rmb	3	; physical address of page holding current aux ptr
 				; third byte is 0/1 for page in main/aux RAM
 
 Z81:		rmb	1
@@ -234,9 +208,9 @@ Z88:		rmb	1
 Z89:		rmb	1
 Z8a:		rmb	1
 Z8b:		rmb	1
+Z8c:		rmb	1	; new compared to EZIP?
+Z8d:		rmb	1	; new compared to EZIP?
 		rmb	8
-Z94:		rmb	1
-Z95:		rmb	1
 Z96:		rmb	1
 Z97:		rmb	1
 Z98:		rmb	1
@@ -263,109 +237,120 @@ Zac:		rmb	1
 Zad:		rmb	1
 Zae:		rmb	1
 Zaf:		rmb	1
-disk_block_num:	rmb	2
-
+Zb0:		rmb	1
+Zb1:		rmb	1
 Zb2:		rmb	1
 Zb3:		rmb	1
-		rmb	2
-Zb6:		rmb	1
+Zb4:		rmb	1
+
+disk_block_num:	rmb	2
+
 Zb7:		rmb	1
 Zb8:		rmb	1
-Zb9:		rmb	1
-Zba:		rmb	1
 		rmb	2
+Zbb:		rmb	1
+Zbc:		rmb	1
 Zbd:		rmb	1
 Zbe:		rmb	1
 Zbf:		rmb	1
-Zc0:		rmb	2
+		rmb	2
 Zc2:		rmb	1
 Zc3:		rmb	1
 Zc4:		rmb	1
-Zc5:		rmb	1
-Zc6:		rmb	1
-Zc7:		rmb	2
-Zc9:		rmb	2
+Zc5:		rmb	2
+Zc7:		rmb	1
+Zc8:		rmb	1
+Zc9:		rmb	1
+Zca:		rmb	1
 Zcb:		rmb	1
-Zcc:		rmb	1
-Zcd:		rmb	1
-Zce:		rmb	1
-Zcf:		rmb	1
+Zcc:		rmb	2
+Zce:		rmb	2
 Zd0:		rmb	1
 Zd1:		rmb	1
 Zd2:		rmb	1
 Zd3:		rmb	1
 Zd4:		rmb	1
 Zd5:		rmb	1
-		rmb	1
+Zd6:		rmb	1
 Zd7:		rmb	1
-		rmb	1
+Zd8:		rmb	1
 Zd9:		rmb	1
-		rmb	4
+Zda:		rmb	1
+		rmb	1
+Zdc:		rmb	1
+		rmb	1
 Zde:		rmb	1
-		rmb	2
-Ze1:		rmb	1
-Ze2:		rmb	1
+		rmb	4
 Ze3:		rmb	1
-Ze4:		rmb	1
-Ze5:		rmb	1
-		rmb	1
+		rmb	2
+Ze6:		rmb	1
 Ze7:		rmb	1
-Ze8:		rmb	2
+Ze8:		rmb	1
+Ze9:		rmb	1
+Zea:		rmb	1
 		rmb	1
-stk_ptr:	rmb	2	; stack pointer
+Zec:		rmb	1
 Zed:		rmb	2
+		rmb	1
+stk_ptr:	rmb	2
+Zf2:		rmb	2
 		rmb	2
 ostream_1_state:	rmb	1
 ostream_2_state:	rmb	1
 ostream_3_state:	rmb	1
-Zf4:		rmb	1
-Zf5:		rmb	1
-Zf6:		rmb	1
-Zf7:		rmb	1
+Zf9:		rmb	1
+Zfa:		rmb	1
+Zfb:		rmb	1
+Zfc:		rmb	1
 
 
 D0100	equ	$0100
-D01ff	equ	$01ff
 
 D0200	equ	$0200
 
 D057b	equ	$057b
 
-D086a	equ	$086a
-S086b	equ	$086b
+D0855	equ	$0855
+S0856	equ	$0856
+S08a9	equ	$08a9
+L08b7	equ	$08b7
+S08c5	equ	$08c5
+S08e1	equ	$08e1
+S08ef	equ	$08ef
+S090b	equ	$090b
+S0927	equ	$0927
+S093b	equ	$093b
+S095e	equ	$095e
 
-		org	$0900
+	org	$0a00
 rwts_sec_buf_size	equ	86
 
-rwts_data_buf	rmb	256	; user data
+rwts_data_buf:	rmb	256	; user data
 rwts_pri_buf:	rmb	256	; disk nibbles
 rwts_sec_buf:	rmb	86	; disk nibbles
 
-	if	iver>=iver2b
-	align	$0100
-	endif
+		align	$0080
 
-D0b56:	rmb	128
-D0bd6:	rmb	128
-D0c56:	rmb	128
-D0cd6:	rmb	128
+local_vars:	rmb	32
 
-; data stack, 256 words, builds upward
-D0d56:	rmb	$0100
-D0e56:	rmb	$0100
-D0f56:	rmb	$0100
-D1056:	rmb	$0100
+D0ca0:		rmb	2	; save hdr_game_ver
+D0ca2:		rmb	2	; save stk_ptr
+D0ca4:		rmb	2	; save Zf2
+D0ca6:		rmb	3	; save PC
+D0ca9:		rmb	1
+D0caa:		rmb	50	; size unknown
 
-local_vars:	rmb	30
+		align	$0100
 
-		rmb	2
+D0d00:		rmb	$80
+D0d80:		rmb	$80
+D0e00:		rmb	$80
+D0e80:		rmb	$80
 
-D1176:		rmb	2	; save hdr_game_ver
-D1178:		rmb	2	; save stk_ptr
-D117a:		rmb	2	; save Zed
-D117c:		rmb	3	; save PC
-
-	align	$0100
+D0f00:		rmb	$0100
+D1000:		rmb	$0100
+D1100:		rmb	$0100
+D1200:		rmb	$0100
 
 max_main_ram_addr	equ	$c000
 
@@ -378,7 +363,8 @@ hdr_arch:	rmb	1	; Z-machine architecture version
 hdr_flags_1:	rmb	1	; flags 1
 hdr_game_ver:	rmb	2	; game version
 hdr_high_mem:	rmb	2	; base of high memory
-hdr_init_pc:	rmb	2	; initial value of program counter (byte address)
+hdr_main_routine: rmb	2	; packed address of initial main routine
+				; in prev arch, was just the initial PC
 hdr_vocab:	rmb	2	; location of dictionary
 hdr_object:	rmb	2	; object table
 hdr_globals:	rmb	2	; global variable table
@@ -388,15 +374,25 @@ hdr_flags2:	rmb	2	; flags 2
 hdr_abbrev:	rmb	2	; abbreviation table
 hdr_length:	rmb	2	; length of file (divided by 4 for v4 and v5)
 hdr_checksum:	rmb	2	; checksum of file
-hdr_interp_platform:	rmb	1	; interpreter platform number
-hdr_interp_rev:	rmb	1	; interpreter revision
-hdr_scr_height:	rmb	1	; screen height, lines of text
+hdr_interp_platform: rmb 1	; interpreter platform number
+hdr_interp_rev:	rmb	1	; interpretr revision
+hdr_screen_height: rmb	1	; screen height, lines of text
 hdr_scr_width:	rmb	1	; screen width, characters
-
-
-D1000	equ	$1000		; used for memory test at startup only, otherwise
-				; would overlap Z-Machine stack or other vars
-
+hdr_scr_width_units: rmb 2	; screen width, "units"
+hdr_scr_height_units: rmb 2	; screeen height, "units"
+hdr_font_width_units: rmb 1	; font width, "units"
+hdr_font_height_units: rmb 1	; font height, "units"
+		rmb	1	; unused
+hdr_unknown_29:	rmb	1	; undocumented for v5 arch
+		rmb	1	; unused
+hdr_unknown_2b:	rmb	1	; undocumented for v5 arch
+		rmb	1	; default background color
+		rmb	1	; default foreground color
+hdr_term_char_tbl: rmb 2	; addr of terminating characters table (bytes)
+hdr_os3_pixels_sent: rmb 2	; total width of pixels of text sent to output stream 3
+hdr_std_rev_num: rmb	2
+		rmb	2	; alphabet table address (bytes), 0 for default
+		rmb	2	; header extension table address (byters)
 
 
 ; Apple IIe I/O
@@ -411,6 +407,9 @@ text_on		equ	$c051
 mixed_off	equ	$c052
 txt_page_1	equ	$c054
 
+Dc061	equ	$c061
+Dc062	equ	$c062
+
 ; Disk II I/O (indexed by slot x 16)
 ph_off	equ	$c080
 mtr_off	equ	$c088
@@ -422,24 +421,12 @@ q6h	equ	$c08d
 q7l	equ	$c08e
 q7h	equ	$c08f
 
-; Apple slot 3 firmware (80-column)
-sl3fw	equ	$c300
-
 
 ; Apple II monitor ROM locations
-			;      IIe  IIe       IIc  IIc   IIc
-			; IIe  enh  opt  IIc  3.5  mem1  mem2  IIc+  IIgs
-romid	equ	$fbb3	; $06  $06  $06  $06  $06  $06   $06   $06   $06f
-romid2	equ	$fbc0	; $ea  $e0  $e0  $00  $00  $00   $00   $00   $ea
+; These are named prefaced with mon_ because the ROM isn't mapped,
+; so trampoline functions in low memory are used to call them.
+mon_cout1	equ	$fdf0
 
-vtab	equ	$fc22
-home	equ	$fc58
-clreol	equ	$fc9c
-Sfca8	equ	$fca8
-rdkey	equ	$fd0c
-cout	equ	$fded
-cout1	equ	$fdf0
-bell	equ	$ff3a
 
 	org	$d000
 
@@ -450,11 +437,11 @@ rwts:
 	php
 	sei
 	jsr	rwts_inner
-	bcs	.fail
+	bcs	Ld00d
 	plp
 	clc
 	rts
-.fail:	plp
+Ld00d:	plp
 	sec
 	rts
 
@@ -626,7 +613,7 @@ read_data_field_16:
 	sta	rwts_sec_buf,y
 	bne	.loop6
 
-; read primary buffer in forward order
+; read prinary buffer in forward order
 .loop8:	sty	Z0d
 .loop9:	ldy	q6l,x
 	bpl	.loop9
@@ -659,7 +646,6 @@ read_data_field_16_fail:
 	rts
 
 
-; search for and read address field
 read_address_field:
 	ldy	#$fc
 	sty	Z0d
@@ -900,7 +886,7 @@ rwts_inner:
 	sta	Z1a
 	jsr	read_data_field_18
 	bcc	.fwd9
-	bcs	.loop9		; always taken
+	bcs	.loop9
 
 ; 16-sector - read an address field
 .fwd8:	jsr	read_address_field
@@ -1112,7 +1098,7 @@ read_data_field_18:
 	bne	.loop10
 
 .loop12:
-	ldy	q6l,x		; get checksum
+	ldy	q6l,x
 	bpl	.loop12
 	dec	Z1a
 	bpl	.loop7
@@ -1127,7 +1113,7 @@ read_data_field_18:
 	rts
 
 
-; subroutine called by boot1
+; subrutine called by boot1
 Sd505:	lda	text_on
 	lda	mixed_off
 	lda	txt_page_1
@@ -1149,19 +1135,17 @@ Sd51d:	lda	#$00
 	ldx	disk_block_num+1
 	ldy	disk_block_num
 
-	cpx	#$01		; is the block number greater than $100?
+	cpx	#$01		; is the block number greater than $100
 	bcc	.fwd5		;   under $100, 16-sector
-
 	bne	.fwd1		;   $200 or over, 18-sector
-
 	cpy	#$8a		; is the block number greater than $18a
-	bcc	.fwd5		;   under $18a, 16-sector
+	bcc	.fwd5		;   under $18as, 16-sector
 
 ; 18-sector
-.fwd1:	lda	Ze7
+.fwd1:	lda	Zec
 	cmp	#$02
 	beq	.fwd2
-	jsr	Sd87e
+	jsr	Sd899
 
 	ldx	disk_block_num+1	; subtract $18a to get side B relative block number
 	ldy	disk_block_num
@@ -1174,7 +1158,7 @@ Sd51d:	lda	#$00
 	tax
 	tya
 
-;restoring divsion by 18 sectors/track for side B
+; restoring division by 18 sectors/track for side B
 	sec
 .loop1:	sbc	#18
 	bcs	.fwd3
@@ -1193,14 +1177,14 @@ Sd51d:	lda	#$00
 
 .no_int_err_0c:
 	lda	#$84
-	bne	.fwd7	; always taken
+	bne	.fwd7		; always taken
 
 ; 16-sector
-.fwd5:	lda	Ze7
+.fwd5:	lda	Zec
 	cmp	#$01
 	beq	.fwd6
-	jsr	Sd856
-	
+	jsr	Sd871
+
 ; convert block number to track and sector, 16-sector (side A)
 	ldx	disk_block_num+1
 	ldy	disk_block_num
@@ -1220,7 +1204,7 @@ Sd51d:	lda	#$00
 	lsr
 	ora	rwts_track
 	clc
-	adc	#3		; first track of side A image
+	adc	#4		; first track of side A image
 	cmp	#35		; max track is 34
 	bcs	int_err_0c
 	sta	rwts_track
@@ -1230,12 +1214,12 @@ Sd51d:	lda	#$00
 .fwd7:	sta	rd_main_ram
 	jsr	rwts
 	bcs	int_err_0e
-	ldy	Ded07
+	ldy	Df090
 	sta	wr_main_ram,y	; indexed to get main or card
 
 	ldy	#$00
 .loop2:	lda	rwts_data_buf,y
-	sta	(Zb2),y
+	sta	(Zb7),y
 	iny
 	bne	.loop2
 
@@ -1243,14 +1227,14 @@ Sd51d:	lda	#$00
 	inc	disk_block_num
 	bne	.fwd8
 	inc	disk_block_num+1
-.fwd8:	inc	Zb3
-	lda	Zb3
+.fwd8:	inc	Zb8
+	lda	Zb8
 	cmp	#$c0
 	bcc	.rtn
 	lda	#$08
-	sta	Zb3
+	sta	Zb8
 	lda	#$01
-	sta	Ded07
+	sta	Df090
 .rtn:	rts
 
 
@@ -1270,14 +1254,14 @@ Ld5c8:	inc	rwts_sector
 	bcs	Ld5f3
 	stx	rwts_track
 .fwd1:	sta	rwts_sector
-	inc	Zb3
+	inc	Zb8
 	clc
 	rts
 
 
 Sd5df:	ldy	#$00
 	sta	rd_main_ram
-.loop1:	lda	(Zb2),y
+.loop1:	lda	(Zb7),y
 	sta	rwts_data_buf,y
 	iny
 	bne	.loop1
@@ -1306,7 +1290,7 @@ read_sector:
 	sta	rd_main_ram
 
 .loop1:	lda	rwts_data_buf,y
-	sta	(Zb2),y
+	sta	(Zb7),y
 	iny
 	bne	.loop1
 
@@ -1320,57 +1304,46 @@ read_sector:
 	bne	.noinctrk
 	ldx	rwts_track
 	inx
-	cpx	#35		; max track is 34
+	cpx	#$23		; max track is 34
 	bcs	Ld5f3
 	stx	rwts_track
 .noinctrk:
 	sta	rwts_sector
-	inc	Zb3
+	inc	Zb8
 	clc
 	rts
 
 ; end of low-level disk routines
 
 
-Sd62f:	jsr	op_new_line
+Sd62f:	jsr	new_line
 	lda	#$00
-	sta	Zd4
-	if	iver<=iver2d
-	jmp	home
-	else
+	sta	Zd9
 	rts
-	endif
 
 
 msg_default_is:
 	text_str	" (Default is "
-Dd646:	text_str	"*) >"
+Dd644:	text_str	"*) >"
 msg_len_default_is	equ	*-msg_default_is
 
 
-; On entry:
+; On entry
 ;   A = default value - 1
-Sd64a:	clc
+Sd648:	clc
 	adc	#'1'
-	sta	Dd646
+	sta	Dd644
 	prt_msg_ret	default_is
 
 
-	if	iver>=iver2b
 max_save_position:
 	fcb	$00
-	endif
 
 
 msg_position:
 	fcb	char_cr
 	text_str	"Position 1-"
-	if	iver==iver2a
-	text_str	"4"
-	else
 msg_position_max_ascii:	text_str	"*"
-	endif
-
 msg_len_position	equ	*-msg_position
 
 
@@ -1386,30 +1359,24 @@ msg_slot:
 msg_len_slot	equ	*-msg_slot
 
 
-Dd67c:	fcb	$05
+Dd67b:	fcb	$05
 
 
 msg_pos_drive_slot_verify:
 	fcb	char_cr,char_cr
 	text_str	"Position "
-Dd688:	text_str	"*; Drive #"
-Dd692:	text_str	"*; Slot "
-Dd69a:	text_str	"*."
+Dd687:	text_str	"*; Drive #"
+Dd691:	text_str	"*; Slot "
+Dd699:	text_str	"*."
 	fcb	char_cr
 	text_str	"Are you sure? (Y/N) >"
-msg_len_pos_drive_slot_verify	equ	*-msg_pos_drive_slot_verify
+msg_len_pos_drive_slot_verify	equ    *-msg_pos_drive_slot_verify
 
 
 msg_insert_save:
 	fcb	char_cr
-	text_str	"Insert"
-	if	iver==iver2d
-	fcb	char_tab
-	else
-	text_str	" "
-	endif
-	text_str	"SAVE disk into Drive #"
-Dd6d0:	text_str	"*."
+	text_str	"Insert SAVE disk into Drive #"
+Dd6cf:	text_str	"*."
 msg_len_insert_save	equ	*-msg_insert_save
 
 
@@ -1425,53 +1392,51 @@ msg_no:
 msg_len_no	equ	*-msg_no
 
 
-Sd6d9:	prt_msg	position
-	lda	Ze1
-	jsr	Sd64a
-.loop1:	jsr	Sda78
+Sd6d8:	prt_msg	position
+	lda	Ze6
+	jsr	Sd648
+.loop1:	bit	kbd_strb
+	jsr	Sfd3f
 	cmp	#char_cr
 	beq	.fwd1
 	sec
 	sbc	#'1'
-	if	iver==iver2a
-	cmp	#4
-	else
 	cmp	max_save_position
-	endif
 	bcc	.fwd2
-	jsr	Sdd39
+	jsr	Sdcfb
 	jmp	.loop1
 
-.fwd1:	lda	Ze1
-.fwd2:	sta	Ze3
+.fwd1:	lda	Ze6
+.fwd2:	sta	Ze8
 	clc
 	adc	#'1'
-	sta	Dd688
-	sta	Dd8d1
-	sta	Dd99d
+	sta	Dd687
+	sta	Dd8ec
+	sta	Dd9dc
 	ora	#$80
-	jsr	Sdaee
+	jsr	Sdb39
 	prt_msg	drive
-	lda	Ze2
-	jsr	Sd64a
-.loop2:	jsr	Sda78
+	lda	Ze7
+	jsr	Sd648
+.loop2:	bit	kbd_strb
+	jsr	Sfd3f
 	cmp	#char_cr
 	beq	.fwd3
 	sec
 	sbc	#'1'
 	cmp	#2
 	bcc	.fwd4
-	jsr	Sdd39
+	jsr	Sdcfb
 	jmp	.loop2
 
-.fwd3:	lda	Ze2
-.fwd4:	sta	Ze4
+.fwd3:	lda	Ze7
+.fwd4:	sta	Ze9
 	clc
 	adc	#'1'
-	sta	Dd6d0
-	sta	Dd692
+	sta	Dd6cf
+	sta	Dd691
 	ora	#$80
-	jsr	Sdaee
+	jsr	Sdb39
 
 	lda	romid2_save	; IIc family?
 	bne	.fwd5		;   no
@@ -1479,30 +1444,32 @@ Sd6d9:	prt_msg	position
 	bne	.fwd7
 
 .fwd5:	prt_msg	slot
-	lda	Dd67c
-	jsr	Sd64a
-.loop3:	jsr	Sda78
+	lda	Dd67b
+	jsr	Sd648
+.loop3:	bit	kbd_strb
+	jsr	Sfd3f
 	cmp	#char_cr
 	beq	.fwd6
 	sec
 	sbc	#'1'
 	cmp	#$07
 	bcc	.fwd7
-	jsr	Sdd39
+	jsr	Sdcfb
 	jmp	.loop3
-.fwd6:	lda	Dd67c
-.fwd7:	sta	Ze5
+.fwd6:	lda	Dd67b
+.fwd7:	sta	Zea
 	clc
 	adc	#'1'
-	sta	Dd69a
+	sta	Dd699
 
 	ldx	romid2_save	; IIc family?
 	beq	.fwd8		;   yes
 	ora	#$80		; no
-	jsr	Sdaee
+	jsr	Sdb39
 
 .fwd8:	prt_msg	pos_drive_slot_verify
-.loop4:	jsr	Sda78
+.loop4:	bit	kbd_strb
+	jsr	Sfd3f
 	cmp	#'y'
 	beq	.fwd10
 	cmp	#'Y'
@@ -1513,17 +1480,17 @@ Sd6d9:	prt_msg	position
 	beq	.fwd9
 	cmp	#'N'
 	beq	.fwd9
-	jsr	Sdd39
+	jsr	Sdcfb
 	jmp	.loop4
 
 .fwd9:	prt_msg	no
-	jmp	Sd6d9
+	jmp	Sd6d8
 
 .fwd10:	prt_msg	yes
-	lda	Ze4
+	lda	Ze9
 	sta	Z02
 	inc	Z02
-	ldx	Ze5
+	ldx	Zea
 	inx
 	txa
 	asl
@@ -1531,28 +1498,7 @@ Sd6d9:	prt_msg	position
 	asl
 	asl
 	sta	Z00
-	lda	Ze3
-
-	if	iver==iver2a
-
-; exactly four save locations, each eight tracks
-	asl
-	asl
-	asl
-	sta	rwts_track
-	lda	Ze3
-	lsr
-	php
-	clc
-	adc	rwts_track
-	sta	rwts_track
-	lda	#$00
-	plp
-	bcc	.fwd11
-	lda	#$08
-.fwd11:	sta	rwts_sector
-
-	else
+	lda	Ze8
 
 	ldx	max_save_position
 	cpx	#$03
@@ -1560,20 +1506,19 @@ Sd6d9:	prt_msg	position
 	clc
 	adc	#$03
 .fwd12:	tax
-	lda	save_start_track_tbl,X
+	lda	save_start_track_tbl,x
 	sta	rwts_track
-	lda	save_start_sector_tbl,X
+	lda	save_start_sector_tbl,x
 	sta	rwts_sector
-
-	endif
 
 	prt_msg	insert_save
 
-Sd7f2:	prt_msg	press_return
-.loop5:	jsr	Sda78
+Sd7fc:	prt_msg	press_return
+.loop5:	bit	kbd_strb
+	jsr	Sfd3f
 	cmp	#char_cr
 	beq	.fwd13
-	jsr	Sdd39
+	jsr	Sdcfb
 	jmp	.loop5
 .fwd13:	rts
 
@@ -1582,45 +1527,32 @@ msg_press_return:
 	fcb	char_cr
 	text_str	"Press [RETURN] to continue."
 	fcb	char_cr
-	if	iver>=iver2h
-	fcb	char_cr
-	fcb	char_cr
-	endif
 msg_len_press_return	equ	*-msg_press_return
 
 
-	if	iver>=iver2b
-save_start_track_tbl:	fcb	$00,$0b,$17		; three save positions
-			fcb	$00,$08,$11,$19		; four save positions
-save_start_sector_tbl:	fcb	$00,$08,$00		; three save positions
-			fcb	$00,$08,$00,$08		; four save positions
-	endif
+save_start_track_tbl:
+	fcb	$00,$0b,$17		; three save positions
+	fcb	$00,$08,$11,$19		; four save positions
+
+save_start_sector_tbl:
+	fcb	$00,$08,$00		; three save positions
+	fcb	$00,$08,$00,$08		; four save positions
 
 
 msg_insert_story:
 	fcb	char_cr
-	text_str	"Insert"
-	if	iver==iver2d
-	fcb	char_tab
-	else
-	text_str	" "
-	endif
-	text_str	"Side "	
-Dd833:	text_str	"* of the STORY disk into Drive #1."
+	text_str	"Insert Side "
+Dd84e:	text_str	"* of the STORY disk into Drive #1."
 	fcb	char_cr
-	if	iver>=iver2h
-	fcb	char_cr
-	fcb	char_cr
-	endif
 msg_len_insert_story	equ	*-msg_insert_story
 
 
-Sd856:	lda	#'1'
-	sta	Dd833
+Sd871:	lda	#'1'
+	sta	Dd84e
 	lda	#$01
-	sta	Ze7
+	sta	Zec
 .loop1:	prt_msg	insert_story
-	jsr	Sd7f2
+	jsr	Sd7fc
 	lda	#$00
 	sta	rwts_sector
 	sta	rwts_track
@@ -1629,30 +1561,30 @@ Sd856:	lda	#'1'
 	lda	#$00
 	jsr	rwts
 	bcs	.loop1
-	bcc	Ld8ac		; always taken
+	bcc	Ld8c7		; always taken
 
 
-Sd87e:	lda	#$32
-	sta	Dd833
+Sd899:	lda	#$32
+	sta	Dd84e
 	lda	#$02
-	sta	Ze7
+	sta	Zec
 	lda	Z02
 	pha
 	lda	#$01
 	sta	Z02
 	pla
 	cmp	#$02
-	beq	Ld8ac
+	beq	Ld8c7
 .loop2:	prt_msg	insert_story
-	jsr	Sd7f2
+	jsr	Sd7fc
 	lda	#$00
 	sta	rwts_sector
 	sta	rwts_track
 	lda	#$84
 	jsr	rwts
 	bcs	.loop2
-Ld8ac:	lda	#$ff
-	sta	Zd4
+Ld8c7:	lda	#$ff
+	sta	Zd9
 	rts
 
 
@@ -1662,97 +1594,101 @@ msg_save_position:
 msg_len_save_position	equ	*-msg_save_position
 
 
-msg_saving_position:
+msg_saving_position
 	fcb	char_cr,char_cr
-	text_str	"Saving"
-	if	iver==iver2d
-	fcb	char_tab
-	else
-	text_str	" "
-	endif
-	text_str	"position "
-Dd8d1:	text_str	"* ..."
+	text_str	"Saving position "
+Dd8ec:	text_str	"* ..."
 	fcb	char_cr
-	if	iver>=iver2h
-	fcb	char_cr
-	fcb	char_cr
-	endif
 msg_len_saving_position	equ	*-msg_saving_position
 
 
 op_save:
+	lda	#$4e		; argcnt matters (new in XZIP)
+	ldx	argcnt
+	beq	.fwd0
+	lda	#$50
+.fwd0:	sta	Dfdee
+
 	jsr	Sd62f
 	prt_msg	save_position
-	jsr	Sd6d9
+	jsr	Sd6d8
 	prt_msg	saving_position
 	lda	hdr_game_ver
-	sta	D1176
+	sta	D0ca0
 	lda	hdr_game_ver+1
-	sta	D1176+1
+	sta	D0ca0+1
 	lda	stk_ptr
-	sta	D1178
+	sta	D0ca2
 	lda	stk_ptr+1
-	sta	D1178+1
-	lda	Zed
-	sta	D117a
-	lda	Zed+1
-	sta	D117a+1
+	sta	D0ca2+1
+	lda	Zf2
+	sta	D0ca4
+	lda	Zf2+1
+	sta	D0ca4+1
 
 	ldx	#$02
 .loop1:	lda	pc,x
-	sta	D117c,x
+	sta	D0ca6,x
 	dex
 	bpl	.loop1
 
-	lda	#(hdr_arch>>8)-1
-	sta	Zb3
+	lda	Dfdee
+	sta	D0ca9
+	cmp	#$50
+	bne	.fwd1
+
+	ldy	#$00
+	lda	(arg3),y
+	tay
+.loop2:	lda	(arg3),y
+	sta	D0caa,y
+	dey
+	bpl	.loop2
+
+.fwd1:	lda	#$0c
+	sta	Zb8
 	jsr	Sd5df
-	bcc	.fwd1
+	bcc	.fwd2
 
-.loop2:	jsr	Sd87e
-
-	if	iver<=iver2d
-	jsr	home
-	endif
-
-	lda	#$16
-	sta	cursrv
-	jsr	vtab
+.loop3:	jsr	Sd899
 	jmp	store_result_zero
 
-.fwd1:	lda	#(hdr_arch>>8)-5
-	sta	Zb3
+.fwd2:	lda	Dfdee
+	cmp	#$50
+	bne	.fwd3
+	lda	arg1+1
+	clc
+	adc	Z81
+	sta	Zb8
+	ldx	arg2+1
+	inx
+	stx	Z6d
+	jmp	.loop5
+
+.fwd3:	lda	#$0f
+	sta	Zb8
 	lda	#$04
 	sta	Z73
-.loop3:	jsr	Sd5df
-	bcs	.loop2
+.loop4:	jsr	Sd5df
+	bcs	.loop3
 	dec	Z73
-	bne	.loop3
+	bne	.loop4
 	lda	Z81
-	sta	Zb3
+	sta	Zb8
 	ldx	hdr_pure
 	inx
 	stx	Z6d
-.loop4:	jsr	Sd5df
-	bcs	.loop2
+.loop5:	jsr	Sd5df
+	bcs	.loop3
 	dec	Z6d
-	bne	.loop4
-
-	jsr	Sd87e
-
-	if	iver<=iver2d
-	jsr	home
-	endif
-
-	lda	#$16
-	sta	cursrv
-	jsr	vtab
-	lda	Ze4
-	sta	Ze2
-	lda	Ze5
-	sta	Dd67c
-	lda	Ze3
-	sta	Ze1
+	bne	.loop5
+	jsr	Sd899
+	lda	Ze9
+	sta	Ze7
+	lda	Zea
+	sta	Dd67b
+	lda	Ze8
+	sta	Ze6
 	lda	#$01
 	ldx	#$00
 	jmp	store_result_xa
@@ -1760,325 +1696,204 @@ op_save:
 
 msg_restore_position:
 	text_str	"Restore Position"
-	fcb	char_cr
+	fcb		char_cr
 msg_len_restore_position	equ	*-msg_restore_position
 
 
 msg_restoring_position:
 	fcb	char_cr,char_cr
 	text_str	"Restoring position "
-Dd99d:	text_str	"* ..."
+Dd9dc:	text_str	"* ..."
 	fcb	char_cr
-	if	iver>=iver2h
-	fcb	char_cr
-	fcb	char_cr
-	endif
 msg_len_restoring_position	equ	*-msg_restoring_position
 
 
 op_restore:
+	lda	#$4e
+	ldx	argcnt
+	beq	.fwd1
+	lda	#$50
+.fwd1:	sta	Dfdee
 	jsr	Sd62f
 	prt_msg	restore_position
-	jsr	Sd6d9
+	jsr	Sd6d8
 	prt_msg	restoring_position
+	lda	Dfdee
+	cmp	#$50
+	bne	.fwd2
+	jmp	.fwd8
 
-	ldx	#$1f
+.fwd2:	ldx	#$1f
 .loop1:	lda	local_vars,x
 	sta	D0100,x
 	dex
 	bpl	.loop1
 
-	lda	#(hdr_arch>>8)-1
-	sta	Zb3
+	lda	#$00
+	sta	Df090
+	lda	#$0c
+	sta	Zb8
 	jsr	read_sector
-	bcs	.loop2
-	lda	D1176
+	bcs	.fwd3
+	lda	D0ca0
 	cmp	hdr_game_ver
-	bne	.loop2
-	lda	D1176+1
+	bne	.fwd3
+	lda	D0ca0+1
 	cmp	hdr_game_ver+1
-	beq	.fwd1
+	beq	.fwd4
 
-.loop2:	ldx	#$1f
-.loop3:	lda	D0100,x
+.fwd3:	ldx	#$1f
+.loop2:	lda	D0100,x
 	sta	local_vars,x
 	dex
-	bpl	.loop3
-	jsr	Sd87e
+	bpl	.loop2
 
-	if	iver<=iver2d
-	jsr	home
-	endif
-	lda	#$16
-	sta	cursrv
-	jsr	vtab
+.rev1:	jsr	Sd899
 	jmp	store_result_zero
 
-.fwd1:	lda	hdr_flags2
+.fwd4:	lda	hdr_flags2
 	sta	Z6d
 	lda	hdr_flags2+1
 	sta	Z6e
 
-	lda	#(hdr_arch>>8)-5
-	sta	Zb3
+	lda	#$0f
+	sta	Zb8
 	lda	#$04
 	sta	Z73
-.loop4:	jsr	read_sector
-	bcs	.loop2
-	dec	Z73
-	bne	.loop4
+.loop3:	jsr	read_sector
+	bcc	.fwd5
+	jmp	int_err_0e
+
+.fwd5:	dec	Z73
+	bne	.loop3
 	lda	Z81
-	sta	Zb3
+	sta	Zb8
 	jsr	read_sector
-	bcs	.loop2
-	lda	Z6d
+	bcc	.fwd6
+	jmp	int_err_0e
+
+.fwd6:	lda	Z6d
 	sta	hdr_flags2
 	lda	Z6e
 	sta	hdr_flags2+1
 	lda	hdr_pure
 	sta	Z6d
-.loop5:	jsr	read_sector
-	bcs	.loop2
-	dec	Z6d
-	bne	.loop5
+.rev2:	jsr	read_sector
+	bcc	.fwd7
+	jmp	int_err_0e
 
-	lda	D1178
+.fwd7:	dec	Z6d
+	bne	.rev2
+	lda	D0ca2
 	sta	stk_ptr
-	lda	D1178+1
+	lda	D0ca2+1
 	sta	stk_ptr+1
-
-	lda	D117a
-	sta	Zed
-	lda	D117a+1
-	sta	Zed+1
-
+	lda	D0ca4
+	sta	Zf2
+	lda	D0ca4+1
+	sta	Zf2+1
 	ldx	#$02
-.loop6:	lda	D117c,x
+.loop4:	lda	D0ca6,x
 	sta	pc,x
 	dex
-	bpl	.loop6
-
+	bpl	.loop4
+.loop5:	jsr	Sd899
 	jsr	find_pc_page
-	jsr	Sd87e
-
-	if	iver<=iver2d
-	jsr	home
-	endif
-
-	lda	#$16
-	sta	cursrv
-	jsr	vtab
-	lda	Ze4
-	sta	Ze2
-	lda	Ze5
-	sta	Dd67c
-	lda	Ze3
-	sta	Ze1
+	lda	Ze9
+	sta	Ze7
+	lda	Zea
+	sta	Dd67b
+	lda	Ze8
+	sta	Ze6
 	lda	#$02
 	ldx	#$00
 	jmp	store_result_xa
 
-
-Sda78:	cld
-	txa
-	pha
-	tya
-	pha
-.loop1:	jsr	rdkey
-	and	#$7f
-	cmp	#$0d
-	bne	.fwd1
-	jmp	.fwd6
-
-.fwd1:	cmp	#$7f
-	bne	.fwd2
-	jmp	.fwd6
-
-.fwd2:	ldx	#$0a
-.loop2:	cmp	Ddad8,x
-	beq	.fwd3
+.fwd8:	lda	#$00
+	sta	Df090
+	lda	#$0a
+	sta	Zb8
+	jsr	read_sector
+	bcs	.fwd11
+	ldy	#$00
+	lda	(arg3),y
+	tay
+	clc
+	adc	#$a0
+	clc
+	adc	#$0a
+	tax
+.loop6:	lda	(arg3),y
+	cmp	rwts_data_buf,x
+	bne	.fwd11
 	dex
-	bpl	.loop2
-	bmi	.fwd4		; always taken
-
-.fwd3:	lda	Ddae3,x
-	bne	.fwd6
-.fwd4:	cmp	#$20
-	bcc	.fwd5
-
-	if	iver<=iver2d
-	cmp	#$2b
-	beq	.fwd5
-	endif
-
-	cmp	#$3c
-	bcc	.fwd6
-	cmp	#$3f
-	beq	.fwd6
-	cmp	#$7b
-	bcs	.fwd5
-	cmp	#$61
-	bcs	.fwd6
-	cmp	#$41
-	bcc	.fwd5
-	cmp	#$5b
-	bcc	.fwd6
-.fwd5:	jsr	Sdd39
-	jmp	.loop1
-.fwd6:	sta	Zd7
-	adc	rndloc
-	sta	rndloc
-	eor	rndloc+1
-	sta	rndloc+1
-	pla
-	tay
-	pla
-	tax
-	lda	Zd7
-	rts
-
-
-Ddad8:	fcb	$08,$15,$0b,$0a,$3c,$5f,$3e,$40
-	fcb	$25
-	if	iver<=iver2b
-	fcb	$5e,$26
-	else
-	fcb	$26,$5e
-	endif
-
-Ddae3:	fcb	$0b,$07,$0e,$0d,$2c,$2d,$2e,$32
-	fcb	$35
-	if	iver<=iver2b
-	fcb	$36,$37
-	else
-	fcb	$37,$0e
-	endif
-
-
-Sdaee:	sta	Zd7
-	txa
-	pha
-	tya
-	pha
-	lda	Zd7
-	jsr	cout
-	pla
-	tay
-	pla
-	tax
-	rts
-
-
-Sdafe:	jsr	Sf446
-	lda	#$00
-	sta	Zd0
-	sta	Zd1
-	ldy	wndtop
-	sty	Zd5
-	dec	argcnt
-	dec	argcnt
-	beq	.fwd3
-	lda	arg3
+	dey
+	bpl	.loop6
+	lda	arg1+1
+	clc
+	adc	Z81
 	sta	Z6e
 	lda	#$00
-	sta	Z70
-	sta	Z6f
-	dec	argcnt
-	beq	.fwd1
-	lda	arg4
-	sta	Z6f
-	lda	arg4+1
-	sta	Z70
-.fwd1:	bit	kbd_strb
-.loop1:	lda	Z6e
 	sta	Z6d
-.loop2:	ldx	#$0a
-.loop3:	lda	#$40
-	jsr	Sfca8
-	dex
-	bne	.loop3
-	bit	kbd
-	bmi	.fwd3
-	dec	Z6d
-	bne	.loop2
-	lda	Z6f
-	ora	Z70
-	bne	.fwd2
-	jmp	.fwd10
-
-.fwd2:	jsr	Sf5f9
-	lda	acc
-	beq	.loop1
-	jmp	.fwd10
-
-.fwd3:	ldy	#$00
-.loop4:	jsr	Sda78
-	cmp	#$0e
-	beq	.fwd7
-	cmp	#$07
-	beq	.fwd7
-	cmp	#$0d
-	beq	.fwd8
-	cmp	#$7f
-	beq	.fwd5
-	cmp	#$0b
-	beq	.fwd5
-	sta	D0200,y
-	iny
-.loop5:	ldx	invflg
-	bpl	.fwd4
-	ora	#$80
-.fwd4:	jsr	Sdaee
-
-	if	iver==iver2a
-	cpy	Zbe
-	else
-	cpy	#$4d
-	endif
-
-	bcc	.loop4
-.loop6:	jsr	Sda78
-	cmp	#$0d
-	beq	.fwd8
-	cmp	#$7f
-	beq	.fwd5
-	cmp	#$0b
-	beq	.fwd5
-	jsr	Sdd39
-	jmp	.loop6
-
-.fwd5:	dey
-	bmi	.fwd6
-	lda	#$08
-	jsr	Sdaee
-	lda	#$a0
-	jsr	Sdaee
-	lda	#$08
-	bne	.loop5
-.fwd6:	ldy	#$00
-.fwd7:	jsr	Sdd39
-	jmp	.loop4
-
-.fwd8:	lda	#$8d
-	sta	D0200,y
-	iny
-	sty	Z9f
-	sty	Zde
-	jsr	Sdaee
-.loop7:	lda	D01ff,y
-	cmp	#$41
+	lda	arg2
+	clc
+	adc	arg1
+	sta	Z6f
+	lda	arg2+1
+	adc	#$00
+	sta	Z70
+	jsr	Sf0fb
+	lda	#$0a
+	sta	Zb8
+	jsr	read_sector
 	bcc	.fwd9
-	cmp	#$5b
-	bcs	.fwd9
-	adc	#$20
-.fwd9:	and	#$7f
-	sta	(Zc3),y
-	dey
+	jmp	int_err_0e
+
+.fwd9:	ldy	arg1
+.loop7:	lda	rwts_data_buf,y
+	sta	(Z6d),y
+	jsr	Sf0fb
+	bcc	.loop5
+	iny
 	bne	.loop7
-	jsr	Sdbf3
-	lda	Z9f
-	rts
-.fwd10:	lda	#$00
+	lda	#$0a
+	sta	Zb8
+	jsr	read_sector
+	bcc	.fwd10
+	jmp	int_err_0e
+
+.fwd10:
+	ldy	#$00
+	jmp	.loop7
+
+.fwd11:	jmp	.rev1
+
+
+op_save_illegal:
+op_restore_illegal:
+	rts		; why not raise an internal error?
+
+
+op_save_undo:
+op_restore_undo:
+	jmp	store_result_zero
+
+
+Sdb39:	sta	Zdc
+	txa
+	pha
+	tya
+	pha
+	lda	Zdc
+	jsr	S08ef
+	cmp	#$8d
+	bne	.fwd1
+	lda	hdr_unknown_29
+	sta	D057b
+.fwd1:	pla
+	tay
+	pla
+	tax
 	rts
 
 
@@ -2091,48 +1906,43 @@ msg_out:
 	sty	Z6f
 	ldx	#$00
 .loop1:
-.lda	fcb	$bd,$00,$00	; lda $0000,x	; self-modifying code, MUST be absolute,x
+.lda:	fcb	$bd,$00,$00	; lda $0000,x	; self-modifying code, MUST be absolute,x
 	ldy	invflg
 	bpl	.fwd1
 	ora	#$80
-.fwd1:	jsr	Sdaee
+.fwd1:	jsr	Sdb39
 	inx
 	dec	Z6f
 	bne	.loop1
 	rts
 
 
-Ldbf2:	rts
+Ldb6f:	rts
 
-Sdbf3:	lda	Zd4
-	beq	Ldbf2
+Sdb70:	lda	Zd9
+	beq	Ldb6f
 	lda	ostream_2_state
-	beq	Ldbf2
+	beq	Ldb6f
 	lda	cswl
 	pha
 	lda	cswl+1
 	pha
-	lda	cursrh
-	pha
 	lda	D057b
 	pha
-	lda	Ddc35
+	lda	Ddbaa
 	sta	cswl
-	lda	Ddc35+1
+	lda	Ddbaa+1
 	sta	cswl+1
 	lda	#$00
-	sta	cursrh
 	sta	D057b
 	ldy	#$00
 .loop1:	lda	D0200,y
-	jsr	cout
+	jsr	S08ef
 	iny
-	dec	Zde
+	dec	Ze3
 	bne	.loop1
 	pla
 	sta	D057b
-	pla
-	sta	cursrh
 	pla
 	sta	cswl+1
 	pla
@@ -2140,27 +1950,27 @@ Sdbf3:	lda	Zd4
 	rts
 
 
-Ddc34:	fcb	$00
-Ddc35:	fdb	$0000
+Ddba9:	fcb	$00
+Ddbaa:	fdb	$0000
 
 
-Sdc37:	prt_msg	printer_slot
+Sdbac:	prt_msg	printer_slot
 	lda	#$00
-	jsr	Sd64a
-	jsr	Sda78
+	jsr	Sd648
+	jsr	Sfd3f
 	cmp	#char_cr
-	beq	.fwd1
+	beq	Ldbca
 	sec
 	sbc	#'0'
 	cmp	#$08
-	bcs	Sdc37
-	bcc	.fwd2
-.fwd1:	lda	#$01
-.fwd2:	clc
+	bcs	Sdbac
+	bcc	Ldbcc
+Ldbca:	lda	#$01
+Ldbcc:	clc
 	adc	#$c0
-	sta	Ddc35+1
-	jsr	Sdd17
-	inc	Ddc34
+	sta	Ddbaa+1
+	jsr	Sdcd9
+	inc	Ddba9
 
 ; send sequence <control-I>80N to convince printer firmware to use
 ; 80 columns
@@ -2168,22 +1978,22 @@ Sdc37:	prt_msg	printer_slot
 	pha
 	lda	cswl+1
 	pha
-	lda	Ddc35
+	lda	Ddbaa
 	sta	cswl
-	lda	Ddc35+1
+	lda	Ddbaa+1
 	sta	cswl+1
 	lda	#$89
-	jsr	cout
+	jsr	S08ef
 	lda	#$b8
-	jsr	cout
+	jsr	S08ef
 	lda	#$b0
-	jsr	cout
+	jsr	S08ef
 	lda	#$ce
-	jsr	cout
+	jsr	S08ef
 	lda	cswl
-	sta	Ddc35
+	sta	Ddbaa
 	lda	cswl+1
-	sta	Ddc35+1
+	sta	Ddbaa+1
 	pla
 	sta	cswl+1
 	pla
@@ -2192,98 +2002,112 @@ Sdc37:	prt_msg	printer_slot
 
 
 op_split_window:
-	lda	hdr_flags_1
-	and	#$20
-	beq	Ldcd7
 	lda	arg1
-	beq	Sdcd8
-	if	iver==iver2a
-	cmp	#23
-	else
+	beq	Sdc51
 	cmp	#24
-	endif
-	bcs	Ldcd7
-	ldx	Zd9
-	beq	.fwd1
+	bcs	Ldc59
+	sta	Zde
+	lda	#24
+	sta	wndbot
 	lda	wndtop
-	sec
-	sbc	arg1
-	bcs	.fwd2
-.fwd1:	lda	arg1
-	if	iver==iver2a
-	sta	wndbot
-	endif
-	sta	Zd9
-	if	iver==iver2a
-	jsr	home
-	endif
-.fwd2:	lda	#24
-	sta	wndbot
+	sta	Z6d
 	lda	arg1
 	sta	wndtop
-	cmp	Zd5
-	bcc	.fwd3
-	sta	Zd5
-.fwd3:	lda	#$00
-	sta	cursrh
-	sta	D057b
-	lda	#23
+	cmp	Zda
+	bcc	.fwd1
+	sta	Zda
+.fwd1:	lda	#$00
+	sta	Dfde7
+	sta	Dfde9
+	sta	Dfdeb
+	lda	cursrv
+	cmp	Z6d
+	bcc	.fwd2
+	cmp	wndtop
+	bcs	Ldc59
+	lda	wndtop
 	sta	cursrv
-	jsr	vtab
-Ldcd7:	rts
+	lda	hdr_unknown_29
+.rev1:	sta	D057b
+	jmp	S08a9
+
+.fwd2:	lda	#$00
+	sta	cursrv
+	beq	.rev1		; always taken
 
 
-Sdcd8:	lda	#$00
+Sdc51:	lda	#$00
 	sta	wndtop
-	sta	Zd5
-	sta	Zd9
-	rts
+	sta	Zda
+	sta	Zde
+Ldc59:	rts
 
 
 op_set_window:
-	lda	hdr_flags_1
-	and	#$01
-	beq	Ldcd7
-	lda	Zd9
-	beq	Ldcd7
+	lda	Zde
+	beq	Ldc59
+	jsr	Sf8e1
+	ldx	Zc7
+	lda	cursrv
+	sta	Dfdea,x
+	sta	Dfde6,x
+	lda	D057b
+	sta	Dfde8,x
 	lda	arg1
 	bne	.fwd1
 	lda	#$ff
-	sta	Zd4
+	sta	Zd9
+	lda	Dfded
+	sta	Zc4
 	lda	#$00
-	sta	Zc2
-
-	if	iver<=iver2d
-	sta	cursrh
-	sta	D057b
-	else
-	lda	Zd0
-	sta	D057b
-	sta	cursrh
-	endif
-
-	lda	#$17
-	sta	cursrv
-
-	if	iver<=iver2d
-	bne	.fwd2
-	else
-	jmp	.fwd2
-	endif
+	sta	Zc7
+	beq	.fwd2		; always taken
 
 .fwd1:	cmp	#$01
-	bne	Ldcd7
-	sta	Zc2
+	bne	Ldc59
+	sta	Zc7
+	lda	Zc4
+	sta	Dfded
 	lda	#$00
-	sta	Zd4
-	sta	cursrh
-	sta	D057b
+	sta	Zd9
+	lda	#$4f
+	sta	Zc4
+.fwd2:	ldx	Zc7
+	lda	Dfdf2,x
+	jsr	Sfab4
+	ldx	Zc7
+	lda	Dfdea,x
 	sta	cursrv
-.fwd2:	jmp	vtab
+	lda	Dfde6,x
+	lda	Dfde8,x
+	sta	D057b
+	jmp	S08a9
 
 
-Sdd17:	lda	#char_cr+$80
-	jmp	cout
+op_set_margins:
+	jsr	Sf8e1
+	lda	arg2
+	sta	hdr_unknown_2b
+	lda	arg1
+	sta	hdr_unknown_29
+	sta	D057b
+	lda	#$4f
+	sec
+	sbc	arg2
+	sbc	arg1
+	sta	Zc4
+	sta	Dfded
+	rts
+
+
+Sdccf:	jsr	S08e1
+	lda	hdr_unknown_29
+	sta	D057b
+	rts
+
+
+Sdcd9:	lda	#$8d
+	jmp	S08ef
 
 
 op_sound_effect:
@@ -2292,62 +2116,72 @@ op_sound_effect:
 	beq	.rtn
 	ldx	arg1
 	dex
-	beq	Sdd39
+	beq	Sdcfb
 	dex
 	bne	.rtn
 	ldy	#$ff
 .loop1:	lda	#$10
-	jsr	Sfca8
+	jsr	S0927
 	lda	spkr
 	dey
 	bne	.loop1
 .rtn:	rts
 
 
-Sdd39:	jmp	bell
+Sdcfb:	jmp	L08b7		; bell
 
 
-Sdd3c:	lda	#$00
-	sta	Zf7
+Sdcfe:	lda	#$00
+	sta	Zfc
 .loop1:	ldy	#$00
 .loop2:	sta	D1000,y
 	iny
 	bne	.loop2
-	inc	Zf7
-	lda	Zf7
+	inc	Zfc
+	lda	Zfc
 	sta	wr_card_ram
 .loop3:	sta	D1000,y
 	iny
 	bne	.loop3
 	sta	wr_main_ram
-	dec	Zf7
+	dec	Zfc
 .loop4:	lda	D1000,y
-	cmp	Zf7
-	bne	.fwd1
+	cmp	Zfc
+	bne	Ldd3e
 	iny
 	bne	.loop4
-	inc	Zf7
+	inc	Zfc
 	sta	rd_card_ram
 .loop5:	lda	D1000,y
-	cmp	Zf7
-	bne	.fwd1
+	cmp	Zfc
+	bne	Ldd3e
 	iny
 	bne	.loop5
 	sta	rd_main_ram
-	lda	Zf7
+	lda	Zfc
 	bne	.loop1
 	clc
 	rts
 
-.fwd1:	sta	rd_main_ram
+Ldd3e:	sta	rd_main_ram
 	sec
 	rts
 
 
+op_set_colour:
+op_draw_picture:
+op_erase_picture:
+	rts
+
+
+op_picture_data:
+	jmp	predicate_false
+
+
 romid2_save:
 	fcb	$00
-Ddd82:	fcb	$00
-Ddd83:	fcb	$00
+Ddd48:	fcb	$00
+Ddd49:	fcb	$00
 
 
 ; interpreter startup entry point jumped from boot1
@@ -2356,16 +2190,14 @@ interp_start:
 	sta	Z00
 	sta	Z01
 
-	if	iver>=iver2b
-	lda	#cout1>>8
+	lda	#mon_cout1>>8
 	sta	cswl+1
-	lda	#cout1&$ff
+	lda	#mon_cout1&$ff
 	sta	cswl
-	endif
 
 	ldx	#$00
 	stx	rwts_sector
-	stx	Zb2
+	stx	Zb7
 
 	inx			; read rest of interpreter starting with track 1
 	stx	rwts_track
@@ -2373,10 +2205,10 @@ interp_start:
 	stx	Z02
 	stx	Z03
 
-	lda	#$df		; starting at $df00
-	sta	Zb3
+	lda	#$de		; starting at $de00
+	sta	Zb8
 
-	lda	#25		; sector count
+	lda	#34		; sector count
 	sta	Z6d
 
 .loop1:	jsr	read_sector
@@ -2386,30 +2218,29 @@ interp_start:
 	lda	#$ff
 	sta	invflg
 
-	lda	romid
-	cmp	#$06		; is the computer an Apple IIe or later?
-	beq	.fwd1		; yes
-	jmp	computer_inadequate
+	jsr	S093b
+	bcc	.fwd1
+	bcs	Ldddd		; always taken
 
-.fwd1:	lda	romid2
-	sta	romid2_save
+.fwd1:	lda	romid2_save
 	beq	.fwd2
-	jsr	Sdd3c
-	bcs	computer_inadequate
-.fwd2:	jsr	sl3fw
+	jsr	Sdcfe
+	bcs	Ldddd
+.fwd2:	jsr	S095e
 
 restart:
 	lda	Z01
 	ldx	Z03
-	sta	Ddd82
-	stx	Ddd83
-	jsr	home
+	sta	Ddd48
+	stx	Ddd49
+	jsr	Sdccf
 	lda	#$0a
 	sta	cursrv
 	lda	#$1b
 	sta	cursrh
 	sta	D057b
-	jsr	vtab
+	jsr	S08a9		; vtab
+
 	prt_msg_alt	story_loading
 
 	lda	#$00		; clear interp zero page vars
@@ -2419,71 +2250,81 @@ restart:
 	bne	.loop2
 
 	inc	stk_ptr
-	inc	Zed
-	inc	Zd4
+	inc	Zf2
+	inc	Zd9
 	inc	ostream_1_state
-	inc	Ze7
+	inc	Zec
 
 	lda	#hdr_arch>>8
 	sta	Z81
-	sta	Zb3
+	sta	Zb8
 
 	lda	#$00
-	sta	Ded07
+	sta	Df090
 	jsr	Sd51d
 
-	lda	hdr_arch	; check header architecture version version
-	cmp	#$04
-	beq	Lde21
+	lda	hdr_arch	; check header architecture version
+	cmp	#$05
+	beq	Ldde9
 
 	lda	#$0f
 	jmp	int_error
 
-computer_inadequate:
-	lda	#$05
+Ldddd:	lda	#$05
 	sta	cursrv
-	jsr	vtab
+	jsr	S08a9
 	lda	#$00
 	jmp	int_error
-
-Lde21:
-	if	iver>=iver2b
-	lda	hdr_pure	; heck header size of impure memory
-	cmp	#$ad		; BUG - should be max_main_ram_pages, which differs ($ad or $ae) depending on interpreter revision
+Ldde9:	lda	hdr_pure
+	cmp	#$ad
 	bcc	.fwd1a
 
 	lda	#$0d
 	jmp	int_error
 
-.fwd1a:	cmp	#$80
-	bcc	.fwd1b
-	lda	#$03
-	bne	.fwd1c
-.fwd1b:	lda	#$04
-.fwd1c:	sta	max_save_position
+.fwd1a:
+	lda	#$03		; no computation, just always use 3 save positions
+	sta	max_save_position
 	clc
 	adc	#$30
 	sta	msg_position_max_ascii
-	endif
 
 	ldx	hdr_high_mem	; base of high memory
 	inx
 	stx	Z82
 
 	lda	hdr_flags_1
-	ora	#$33		; bit 0: coulurs available (!)
-				; bit 1: picture display av (!)
-				; bit 4: fixed-space style av
-				; bit 5: sound effects av
+	ora	#$30		; bit 4: fixed-space style available
+				; bit 5: sound effects available
 	sta	hdr_flags_1
 
-	lda	#iver>>8	; set interpreter platform number
-	sta	hdr_interp_platform
-	lda	#$40+(iver&$ff)	; set interpreter revision
+; set interpreter platform number
+	lda	#2		;   2 for Apple IIe
+	ldx	romid2_save
+	bne	.fwd2
+	lda	#9		; 9 for Apple IIc
+.fwd2:	sta	hdr_interp_platform
+
+	lda	#$40+(iver&$ff)	; set intpreter revision
 	sta	hdr_interp_rev
 
-	lda	#24		; set screen dimensiosn
-	sta	hdr_scr_height
+; screen size in "units"
+	lda	#0
+	sta	hdr_scr_width_units
+	sta	hdr_scr_height_units
+	lda	#80
+	sta	hdr_scr_width_units+1
+	lda	#24
+	sta	hdr_scr_height_units+1
+
+; font size in "units"
+	lda	#1
+	sta	hdr_font_width_units
+	sta	hdr_font_height_units
+
+; screen size in characters
+	lda	#24
+	sta	hdr_screen_height
 	lda	#80
 	sta	hdr_scr_width
 
@@ -2508,26 +2349,49 @@ Lde21:
 	lda	hdr_object+1
 	sta	Z89
 
-	jsr	Seeef
-	jsr	home
+	lda	hdr_term_char_tbl
+	ora	hdr_term_char_tbl+1
+	beq	Lde7f
+	lda	hdr_term_char_tbl
+	clc
+	adc	Z81
+	sta	Z8c
+	lda	hdr_term_char_tbl+1
+	sta	Z8b
+Lde7f:	jsr	Sf278
+	lda	Z8c
+	ora	Z8b
+	beq	Lde97
+	ldy	#$ff
+Lde8a:	iny
+	lda	(Z8b),y
+	beq	Lde97
+	cmp	#$ff
+	bne	Lde8a
+	lda	#$01
+	sta	Zb4
+Lde97:	jsr	Sdccf
 
-	lda	hdr_init_pc
+	lda	hdr_main_routine
 	sta	pc+1
-	lda	hdr_init_pc+1
+	lda	hdr_main_routine+1
 	sta	pc
 
 	jsr	find_pc_page
-	ldx	wndwdt
+	ldx	#80		; constant, rather than wndwdt in older
 	dex
-	stx	Zbf
-	lda	Ddc34
+	stx	Zc4
+	stx	Dfded
+	lda	Ddba9
 	bpl	.fwd3
+
 	lda	#$01
-	sta	Ddc34
+	sta	Ddba9
 	sta	ostream_2_state
-	ora	hdr_flags2+1
+	ora	hdr_flags2+1	; git 8 of hdr_flags2 is not defined for v5
 	sta	hdr_flags2+1
-.fwd3:	jsr	home
+
+.fwd3:	jsr	Sdccf
 ; fall into main loop
 
 main_loop:
@@ -2549,34 +2413,38 @@ op_b0_ff:
 	bcs	op_c0_ff
 	jmp	op_b0_bf
 
-; opcode $c0..$ff: VAR format
 op_c0_ff:
 	cmp	#$ec		; is it call_vs2 (up to 8 args)?
-	beq	op_ec		;   yes
+	bne	.fwd1
+	jmp	op_ec		;   yes
 
-	jsr	fetch_pc_byte
+.fwd1:	cmp	#$fa		; is it call_vn2 (up to 8 args)?
+	bne	.fwd1a
+	jmp	op_fa		;   yes
+
+.fwd1a:	jsr	fetch_pc_byte
 	sta	Z68
 	ldx	#$00
 	stx	Z6a
-	beq	.fwd1		; always taken
+	beq	.fwd1b		; always taken
 
 .loop1:	lda	Z68
 	asl
 	asl
 	sta	Z68
-.fwd1:	and	#$c0
+.fwd1b:	and	#$c0
 	bne	.fwd2
-	jsr	Se075
+	jsr	Se0db
 	jmp	.fwd4
 
 .fwd2:	cmp	#$40
 	bne	.fwd3
-	jsr	Se071
+	jsr	Se0d7
 	jmp	.fwd4
 
 .fwd3:	cmp	#$80
-	bne	Ldf08
-	jsr	Se089
+	bne	dispatch_var
+	jsr	Se0ef
 .fwd4:	ldx	Z6a
 	lda	acc
 	sta	arg1,x
@@ -2588,29 +2456,52 @@ op_c0_ff:
 	stx	Z6a
 	cpx	#$08
 	bcc	.loop1
-Ldf08:	lda	opcode
+
+dispatch_var:
+	lda	opcode
 	cmp	#$e0
-	bcs	Ldf11
+	bcs	dispatch_var_op_tab
+	cmp	#$c0
+	bcc	op_extended
 	jmp	dispatch_2op_tab
 
-; dispatch through VAR op table
-Ldf11:	and	#$1f
+dispatch_var_op_tab:
+	and	#$1f
 	tay
 	lda	tab_var_lo,y
-	sta	Ldf20+1
+	sta	.jsr+1
 	lda	tab_var_hi,y
-	sta	Ldf20+2
-Ldf20	jsr	$ffff		; self-modifying code
+	sta	.jsr+2
+.jsr	jsr	$ffff		; self-modifying code
 	jmp	main_loop
 
 
-int_err_01:
-	lda	#$01
+op_extended:
+	cmp	#$0b
+	bcs	int_err_10
+
+	tay
+	lda	tab_ext_lo,y
+	sta	.jsr+1
+	lda	tab_ext_hi,y
+	sta	.jsr+2
+.jsr	jsr	$ffff
+	jmp	main_loop
+
+
+	fcb	$a9,$01,$4c,$32,$f6
+
+
+int_err_10:
+	lda	#$10
 	jmp	int_error
 
 
-; call_vf2, up to eight args
-op_ec:	jsr	fetch_pc_byte
+; call_vs2, up to eight args
+; call_vn2, up to eight args
+op_ec:
+op_fa:
+	jsr	fetch_pc_byte
 	sta	Z68
 	jsr	fetch_pc_byte
 	sta	Z69
@@ -2624,17 +2515,17 @@ op_ec:	jsr	fetch_pc_byte
 	sta	Z68
 .loop2:	and	#$c0
 	bne	.fwd1
-	jsr	Se075
+	jsr	Se0db
 	jmp	.fwd3
 
 .fwd1:	cmp	#$40
 	bne	.fwd2
-	jsr	Se071
+	jsr	Se0d7
 	jmp	.fwd3
 
 .fwd2:	cmp	#$80
-	bne	Ldf08
-	jsr	Se089
+	bne	dispatch_var
+	jsr	Se0ef
 
 .fwd3:	ldx	Z6a
 	lda	acc
@@ -2646,8 +2537,10 @@ op_ec:	jsr	fetch_pc_byte
 	inx
 	stx	Z6a
 	cpx	#$10
-	beq	Ldf08
-	cpx	#$08
+	bne	.fwd4
+	jmp	dispatch_var
+
+.fwd4:	cpx	#$08
 	bne	.loop1
 	lda	Z69
 	sta	Z68
@@ -2656,26 +2549,32 @@ op_ec:	jsr	fetch_pc_byte
 
 ; 0OP instructions
 op_b0_bf:
+	cmp	#$be		; extend?
+	beq	op_be
 	and	#$0f
 	tay
 	lda	tab_0op_lo,y
 	sta	.jsr+1
 	lda	tab_0op_hi,y
 	sta	.jsr+2
-.jsr:	jsr	$ffff		; self-modifying code
+.jsr	jsr	$ffff		; self-modifying code
 	jmp	main_loop
 
 
-int_err_02:
+; unreferenced?
 	lda	#$02
 	jmp	int_error
+
+
+op_be:	jsr	fetch_pc_byte
+	sta	opcode
+	jmp	op_c0_ff
 
 
 op_80_af:
 	and	#$30
 	bne	.fwd2
 
-; 1OP 
 	fetch_pc_byte_inline
 	jmp	.fwd3
 
@@ -2688,22 +2587,21 @@ op_80_af:
 	inc	argcnt
 	jmp	dispatch_1op
 
-.fwd5:	jsr	Se089
-	jsr	Se066
+.fwd5:	jsr	Se0ef
+	jsr	Se0cc
 dispatch_1op:
 	lda	opcode
 	and	#$0f
 	tay
 	lda	tab_1op_lo,y
-	sta	Ldfea+1
+	sta	.jsr+1
 	lda	tab_1op_hi,y
-	sta	Ldfea+2
-Ldfea:	jsr	$ffff		; self-modifying code
+	sta	.jsr+2
+.jsr	jsr	$ffff		; self-modifying code
 	jmp	main_loop
 
 
-; unreferenced - was used in e.g. ZIP interpreter F
-int_err_03:
+; unreferenced - was used in e.g. ZIP intepreter F
 	lda	#$03
 	jmp	int_error
 
@@ -2714,7 +2612,7 @@ op_00_7f:
 	bne	.fwd1
 
 ; first arg is immediate byte
-	sta	arg1+1	 	; A contains zero
+	sta	arg1+1		; A contains zero
 	fetch_pc_byte_inline
 	sta	arg1
 	inc	argcnt
@@ -2722,8 +2620,8 @@ op_00_7f:
 
 .fwd1:
 ; first arg is a variable
-	jsr	Se089
-	jsr	Se066		; store acc in arg1 and increment argcnt
+	jsr	Se0ef
+	jsr	Se0cc		; store acc in arg1 and increment argcnt
 
 .fwd2:
 ; check type of second arg
@@ -2739,7 +2637,7 @@ op_00_7f:
 
 .fwd3:
 ; second arg is variable
-	jsr	Se089
+	jsr	Se0ef
 	lda	acc
 	sta	arg2
 	lda	acc+1
@@ -2755,7 +2653,7 @@ dispatch_2op_tab:
 	sta	.jsr+1
 	lda	tab_2op_hi,y
 	sta	.jsr+2
-.jsr:	jsr	$ffff		; self-modifying code
+.jsr	jsr	$ffff		; self-modifying code
 	jmp	main_loop
 
 
@@ -2764,7 +2662,7 @@ int_err_04:
 	jmp	int_error
 
 
-Se066:	lda	acc
+Se0cc:	lda	acc
 	sta	arg1
 	lda	acc+1
 	sta	arg1+1
@@ -2772,25 +2670,25 @@ Se066:	lda	acc
 	rts
 
 
-Se071:	lda	#$00
-	beq	Le078		; always taken
+Se0d7:	lda	#$00
+	beq	Le0de		; always taken
 
-Se075:	jsr	fetch_pc_byte
-Le078:	sta	acc+1
+Se0db:	jsr	fetch_pc_byte
+Le0de:	sta	acc+1
 	jsr	fetch_pc_byte
 	sta	acc
 	rts
 
 
-Se080:	tax
-	bne	Le08e
+Se0e6:	tax
+	bne	Le0f4
 	jsr	pop_acc
 	jmp	push_acc
 
-Se089:	jsr	fetch_pc_byte
+Se0ef:	jsr	fetch_pc_byte
 	beq	pop_acc
-Le08e:	cmp	#$10
-	bcs	Le09f
+Le0f4:	cmp	#$10
+	bcs	Le105
 	asl
 	tax
 	lda	local_vars-2,x
@@ -2798,8 +2696,7 @@ Le08e:	cmp	#$10
 	lda	local_vars-1,x
 	sta	acc+1
 	rts
-
-Le09f:	jsr	Se14b
+Le105:	jsr	Se1b1
 	lda	(Z6d),y
 	sta	acc+1
 	iny
@@ -2808,29 +2705,27 @@ Le09f:	jsr	Se14b
 	rts
 
 
-op_pop:
 pop_acc:
 	lda	stk_ptr
-	bne	.fwd1
+	bne	Le118
 	sta	stk_ptr+1
-.fwd1:	dec	stk_ptr
-	bne	.fwd2
+Le118:	dec	stk_ptr
+	bne	Le120
 	ora	stk_ptr+1
-	beq	int_err_05	; data stack underflow
-.fwd2:	ldy	stk_ptr
+	beq	int_err_05
+Le120:	ldy	stk_ptr
 	lda	stk_ptr+1
-	beq	.fwd3
-	lda	D0e56,y
+	beq	Le132
+	lda	D1000,y
 	sta	acc
 	tax
-	lda	D1056,y
+	lda	D1200,y
 	sta	acc+1
 	rts
-
-.fwd3:	lda	D0d56,y
+Le132:	lda	D0f00,y
 	sta	acc
 	tax
-	lda	D0f56,y
+	lda	D1100,y
 	sta	acc+1
 	rts
 
@@ -2849,29 +2744,23 @@ push_ax:
 	pha
 	ldy	stk_ptr
 	lda	stk_ptr+1
-	beq	.fwd1
-
-	if	iver==iver2a
-	tax			; wrong! how did this ever work at all?
-	else
+	beq	Le159
 	txa
-	endif
-	sta	D0e56,y
+	sta	D1000,y
 	pla
-	sta	D1056,y
-	jmp	.fwd2
-
-.fwd1:	txa
-	sta	D0d56,y
+	sta	D1200,y
+	jmp	Le161
+Le159:	txa
+	sta	D0f00,y
 	pla
-	sta	D0f56,y
-.fwd2:	inc	stk_ptr
-	bne	.fwd3
+	sta	D1100,y
+Le161:	inc	stk_ptr
+	bne	Le16d
 	lda	stk_ptr
 	ora	stk_ptr+1
 	bne	int_err_06	; data stack overflow
 	inc	stk_ptr+1
-.fwd3:	rts
+Le16d:	rts
 
 
 int_err_06:
@@ -2879,8 +2768,8 @@ int_err_06:
 	jmp	int_error
 
 
-Le10d:	tax
-	bne	Le12d
+Le173:	tax
+	bne	Le193
 	lda	stk_ptr
 	bne	.fwd1
 	sta	stk_ptr+1
@@ -2905,7 +2794,7 @@ store_result_xa:
 store_result:
 	jsr	fetch_pc_byte
 	beq	push_acc
-Le12d:	cmp	#$10
+Le193:	cmp	#$10
 	bcs	.fwd2
 
 ; store result in acc into local variable specified by A
@@ -2918,7 +2807,7 @@ Le12d:	cmp	#$10
 	rts
 
 ; store result in acc into global variable specified by A (offset by $10)
-.fwd2:	jsr	Se14b
+.fwd2:	jsr	Se1b1
 	lda	acc+1
 	sta	(Z6d),y
 	iny
@@ -2927,7 +2816,7 @@ Le12d:	cmp	#$10
 	rts
 
 
-Se14b:	sec
+Se1b1:	sec
 	sbc	#$10
 	ldy	#$00
 	sty	Z6e
@@ -2939,21 +2828,21 @@ Se14b:	sec
 	lda	Z6e
 	adc	Z84
 	sta	Z6e
-Le160:	rts
+Le1c6:	rts
 
 
 predicate_false:
 	jsr	fetch_pc_byte
-	bpl	Le172
-Le166:	and	#$40
-	bne	Le160
+	bpl	Le1d8
+Le1cc:	and	#$40
+	bne	Le1c6
 	jmp	fetch_pc_byte
 
 
 predicate_true:
 	jsr	fetch_pc_byte
-	bpl	Le166
-Le172:	tax
+	bpl	Le1cc
+Le1d8:	tax
 	and	#$40
 	beq	.fwd1
 	txa
@@ -2975,16 +2864,16 @@ Le172:	tax
 	jsr	fetch_pc_byte
 	sta	acc
 	lda	acc+1
-	bne	Le1a7
+	bne	Le20d
 .fwd3:	lda	acc
 	bne	.fwd4
 	jmp	op_rfalse
 
 .fwd4:	cmp	#$01
-	bne	Le1a7
+	bne	Le20d
 	jmp	op_rtrue
 
-Le1a7:	lda	acc
+Le20d:	lda	acc
 	sec
 	sbc	#$02
 	tax
@@ -3021,7 +2910,7 @@ Le1a7:	lda	acc
 op_nop:	rts
 
 
-Se1e3:	lda	arg1
+Se249:	lda	arg1
 	sta	acc
 	lda	arg1+1
 	sta	acc+1
@@ -3042,17 +2931,17 @@ Se1e3:	lda	arg1
 	optab_ent	op_print	; (literal string)
 	optab_ent	op_print_ret	; (literal string)
 	optab_ent	op_nop
-	optab_ent	op_save
-	optab_ent	op_restore
+	optab_ent	op_save_illegal
+	optab_ent	op_restore_illegal
 	optab_ent	op_restart
 	optab_ent	op_ret_popped
-	optab_ent	op_pop
+	optab_ent	op_catch
 	optab_ent	op_quit
 	optab_ent	op_new_line
-	optab_ent	op_show_status	; [nop, some games might mistakenly use]
+	optab_ent	op_show_status	; [nop, some games might mistakenly use])
 	optab_ent	op_verify
-	optab_ent	int_err_02	; [illegal]
-	optab_ent	int_err_02	; [illegal]
+	optab_ent	op_extended
+	optab_ent	op_piracy	; [always a true predicate, indicating game is authentic]
 
 
 ; 1OP instructions (one operand), opcodes $80..$af
@@ -3072,12 +2961,12 @@ Se1e3:	lda	arg1
 	optab_ent	op_jump
 	optab_ent	op_print_paddr
 	optab_ent	op_load
-	optab_ent	op_not
+	optab_ent	op_call_1n
 
 
 ; 2OP instructions (two operand), opcodes $20..$7f
-; The 2OP table is also used for VAR instructions (0-4 operands),
-; opcodes $c0..$df
+; The 2OP table is also used for VAR instructions (0-4 or 0-8 operands),
+; opcodes $e0..$df
 	optab_start	tab_2op,32
 	optab_ent	int_err_04	; [illegal]
 	optab_ent	op_je
@@ -3105,22 +2994,22 @@ Se1e3:	lda	arg1
 	optab_ent	op_div
 	optab_ent	op_mod
 	optab_ent	op_call_2s
-	optab_ent	int_err_04	; [illegal]
-	optab_ent	int_err_04	; [illegal]
-	optab_ent	int_err_04	; [illegal]
+	optab_ent	op_call_2n
+	optab_ent	op_set_colour	; [nop]
+	optab_ent	op_throw
 	optab_ent	int_err_04	; [illegal]
 	optab_ent	int_err_04	; [illegal]
 	optab_ent	int_err_04	; [illegal]
 
 
-; VAR instructions (0-4 operands, 0-8 for call_vs2),
+; VAR instructions (0-4 operands, 0-8 for call_vs2 and call_vn2),
 ; opcodes $e0..$ff
 	optab_start	tab_var,32
 	optab_ent	op_call_vs	; (up to 3 args)
 	optab_ent	op_storew
 	optab_ent	op_storeb
 	optab_ent	op_put_prop
-	optab_ent	op_sread
+	optab_ent	op_aread	; (sread in v1 through v4)
 	optab_ent	op_print_char
 	optab_ent	op_print_num
 	optab_ent	op_random
@@ -3132,34 +3021,51 @@ Se1e3:	lda	arg1
 	optab_ent	op_erase_window
 	optab_ent	op_erase_line
 	optab_ent	op_set_cursor
-	optab_ent	op_get_cursor	; [nop]
-	optab_ent	op_set_text_state
+	optab_ent	op_get_cursor
+	optab_ent	op_set_text_style
 	optab_ent	op_buffer_mode
 	optab_ent	op_output_stream
 	optab_ent	op_input_stream	; [nop]
 	optab_ent	op_sound_effect
 	optab_ent	op_read_char
 	optab_ent	op_scan_table
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
-	optab_ent	int_err_01
+	optab_ent	op_not
+	optab_ent	op_call_vn	; (up to 3 args)
+	optab_ent	op_call_vn2	; (up to 7 args)
+	optab_ent	op_tokenise
+	optab_ent	op_encode_text
+	optab_ent	op_copy_table
+	optab_ent	op_print_table
+	optab_ent	op_check_arg_count
+
+
+; EXT instructions
+	optab_start	tab_ext,11
+	optab_ent	op_save
+	optab_ent	op_restore
+	optab_ent	op_log_shift
+	optab_ent	op_art_shift
+	optab_ent	op_set_font
+	optab_ent	op_draw_picture	; [nop, not in v5 spec]
+	optab_ent	op_picture_data	; [not in v5 spec]
+	optab_ent	op_erase_picture	; [nop, not in v5 spec]
+	optab_ent	op_set_margins	; [not in v5 spec]
+	optab_ent	op_save_undo	; [not implemented, returns 0 (fail),
+					;  according to spec should return -1]
+	optab_ent	op_restore_undo	; [not implemented, returns 0 (fail)]
 
 
 op_rtrue:
 	ldx	#$01
-Le2b7:	lda	#$00
-Le2b9:	stx	arg1
+Le333:	lda	#$00
+Le335:	stx	arg1
 	sta	arg1+1
 	jmp	op_ret
 
+
 op_rfalse:
 	ldx	#$00
-	beq	Le2b7
+	beq	Le333
 
 
 op_print:
@@ -3168,7 +3074,7 @@ op_print:
 	sta	aux_ptr,x
 	dex
 	bpl	.loop1
-	jsr	Sef7e
+	jsr	Sf307
 	ldx	#$05
 .loop2:	lda	aux_ptr,x
 	sta	pc,x
@@ -3185,100 +3091,23 @@ op_print_ret:
 
 op_ret_popped:
 	jsr	pop_acc
-	jmp	Le2b9
+	jmp	Le335
 
 
-op_verify:
-	jsr	op_new_line
-	ldx	#$03
-	lda	#$00
-	if	iver>=iver2b
-	sta	Zd7
-	endif
-.loop1:	sta	Z71,x
-	sta	aux_ptr,x
-	dex
-	bpl	.loop1
-	lda	#$40
-	sta	aux_ptr
-	lda	hdr_length
-	sta	Z6e
-	lda	hdr_length+1
-	asl
-	rol	Z6e
-	rol	Z71
-	asl
-	sta	Z6d
-	rol	Z6e
-	rol	Z71
-	lda	#$00
-	sta	disk_block_num
-	sta	disk_block_num+1
-	jmp	.fwd1
-
-.loop2:	lda	aux_ptr
-	bne	.fwd2
-.fwd1:	lda	#$09
-	sta	Zb3
-	lda	#$00
-	sta	Ded07
-	jsr	Sd51d
-
-	if	iver>=iver2b
- 	lda	Zd7
- 	bne	.fwd2
- 	lda	Ze7
- 	cmp	#$02
- 	bne	.fwd2
-	prt_msg_alt	be_patient
- 	inc	Zd7
-	endif
-
-.fwd2:	ldy	aux_ptr
-	lda	rwts_data_buf,y
-	inc	aux_ptr
-	bne	.fwd3
-	inc	aux_ptr+1
-	bne	.fwd3
-	inc	aux_ptr+2
-.fwd3:	clc
-	adc	Z73
-	sta	Z73
-	bcc	.fwd4
-	inc	Z74
-.fwd4:	lda	aux_ptr
-	cmp	Z6d
-	bne	.loop2
-	lda	aux_ptr+1
-	cmp	Z6e
-	bne	.loop2
-	lda	aux_ptr+2
-	cmp	Z71
-	bne	.loop2
-	lda	hdr_checksum+1
-	cmp	Z73
-	bne	.rtn_f
-	lda	hdr_checksum
-	cmp	Z74
-	bne	.rtn_f
-	jmp	predicate_true
-
-.rtn_f:	jmp	predicate_false
+op_catch:
+	ldx	Zf2+1
+	lda	Zf2
+	jmp	store_result_xa
 
 
-	if	iver>=iver2b
-msg_be_patient:
-	fcb	char_cr
-	text_str	"Please be patient, this takes a while"
-	fcb	char_cr
-msg_len_be_patient	equ	*-msg_be_patient
-	endif
+op_piracy:
+	jmp	predicate_true		; always reports game is authentic
 
 
 op_jz:	lda	arg1
 	ora	arg1+1
-	beq	Le394
-Le36c:	jmp	predicate_false
+	beq	Le39d
+Le375:	jmp	predicate_false
 
 
 op_get_sibling:
@@ -3286,7 +3115,7 @@ op_get_sibling:
 	ldx	arg1+1
 	jsr	setup_object
 	ldy	#$08
-	bne	Le383		; always taken
+	bne	Le38c		; always taken
 
 
 op_get_child:
@@ -3294,16 +3123,16 @@ op_get_child:
 	ldx	arg1+1
 	jsr	setup_object
 	ldy	#$0a
-Le383:	lda	(Z6d),y
+Le38c:	lda	(Z6d),y
 	tax
 	iny
 	lda	(Z6d),y
 	jsr	store_result_xa
 	lda	acc
-	bne	Le394
+	bne	Le39d
 	lda	acc+1
-	beq	Le36c
-Le394:	jmp	predicate_true
+	beq	Le375
+Le39d:	jmp	predicate_true
 
 
 op_get_parent:
@@ -3344,15 +3173,15 @@ op_get_prop_len:
 
 
 op_inc:	lda	arg1
-	jsr	Se080
+	jsr	Se0e6
 	inc	acc
 	bne	.fwd1
 	inc	acc+1
-.fwd1:	jmp	Le3f4
+.fwd1:	jmp	Le3fd
 
 
 op_dec:	lda	arg1
-	jsr	Se080
+	jsr	Se0e6
 	lda	acc
 	sec
 	sbc	#$01
@@ -3360,8 +3189,8 @@ op_dec:	lda	arg1
 	lda	acc+1
 	sbc	#$00
 	sta	acc+1
-Le3f4:	lda	arg1
-	jmp	Le10d
+Le3fd:	lda	arg1
+	jmp	Le173
 
 
 op_print_addr:
@@ -3369,8 +3198,8 @@ op_print_addr:
 	sta	Z6d
 	lda	arg1+1
 	sta	Z6e
-	jsr	Secf8
-	jmp	Sef7e
+	jsr	Sf081
+	jmp	Sf307
 
 
 op_remove_obj:
@@ -3454,17 +3283,19 @@ op_print_obj:
 	inc	Z6d
 	bne	.fwd1
 	inc	Z6e
-.fwd1:	jsr	Secf8
-	jmp	Sef7e
+.fwd1:	jsr	Sf081
+	jmp	Sf307
 
 
-op_ret:	lda	Zed
+op_ret:	lda	Zf2
 	sta	stk_ptr
-	lda	Zed+1
+	lda	Zf2+1
 	sta	stk_ptr+1
 	jsr	pop_acc
 	stx	Z6e
-	txa
+	jsr	pop_acc
+	sta	Dfdef
+	ldx	Z6e
 	beq	.fwd1
 	dex
 	txa
@@ -3485,18 +3316,32 @@ op_ret:	lda	Zed
 	stx	pc+1
 	sta	pc+2
 	jsr	pop_acc
+	stx	call_store_result_flag
 	sta	pc
 	jsr	pop_acc
-	stx	Zed
-	sta	Zed+1
-	jsr	find_pc_page
-	jsr	Se1e3
-Le4db:	jmp	store_result	; self-modifying code - jmp target changed by code at Sf5f9 and Lf67c
+	stx	Zf2
+	sta	Zf2+1
+	lda	pc
+	bne	.fwd2
+	lda	pc+1
+	bne	.fwd2
+	lda	pc+2
+	bne	.fwd2
+	jsr	Se249
+	jmp	Lfd19
+
+.fwd2:	jsr	find_pc_page
+	lda	call_store_result_flag
+	beq	.fwd3
+	rts
+
+.fwd3:	jsr	Se249
+	jmp	store_result
 
 
 op_jump:
-	jsr	Se1e3
-	jmp	Le1a7
+	jsr	Se249
+	jmp	Le20d
 
 
 op_print_paddr:
@@ -3504,48 +3349,34 @@ op_print_paddr:
 	sta	Z6d
 	lda	arg1+1
 	sta	Z6e
-	jsr	Sef65
-	jmp	Sef7e
+	jsr	Sf2ee
+	jmp	Sf307
 
 
 op_load:
 	lda	arg1
-	jsr	Se080
+	jsr	Se0e6
 	jmp	store_result
 
 
-op_not:	lda	arg1
-	eor	#$ff
-	tax
-	lda	arg1+1
-	eor	#$ff
-; fall into store_result_ax
-
-; store result in A:X into variable (or stack) designated by next byte of program
-store_result_ax:
-	stx	acc
-	sta	acc+1
-	jmp	store_result
-
-
-op_jl:	jsr	Se1e3
-	jmp	Le513
+op_jl:	jsr	Se249
+	jmp	Le52e
 
 
 op_dec_chk:
 	jsr	op_dec
-Le513:	lda	arg2
+Le52e:	lda	arg2
 	sta	Z6d
 	lda	arg2+1
 	sta	Z6e
-	jmp	Le53c
+	jmp	Le557
 
 
 op_jg:	lda	arg1
 	sta	Z6d
 	lda	arg1+1
 	sta	Z6e
-	jmp	Le534
+	jmp	Le54f
 
 
 op_inc_chk:
@@ -3554,16 +3385,16 @@ op_inc_chk:
 	sta	Z6d
 	lda	acc+1
 	sta	Z6e
-Le534:	lda	arg2
+Le54f:	lda	arg2
 	sta	acc
 	lda	arg2+1
 	sta	acc+1
-Le53c:	lda	Z6e
+Le557:	lda	Z6e
 	eor	acc+1
 	bpl	.fwd1
 	lda	Z6e
 	cmp	acc+1
-	bcc	Le583
+	bcc	Le59e
 	jmp	predicate_false
 
 .fwd1:	lda	acc+1
@@ -3571,7 +3402,7 @@ Le53c:	lda	Z6e
 	bne	.fwd2
 	lda	acc
 	cmp	Z6d
-.fwd2:	bcc	Le583
+.fwd2:	bcc	Le59e
 	jmp	predicate_false
 
 
@@ -3582,24 +3413,24 @@ op_jin:	lda	arg1
 	ldy	#$06
 	lda	(Z6d),y
 	cmp	arg2+1
-	bne	Le570
+	bne	Le58b
 	iny
 	lda	(Z6d),y
 	cmp	arg2
-	beq	Le583
-Le570:	jmp	predicate_false
+	beq	Le59e
+Le58b:	jmp	predicate_false
 
 
 op_test:
 	lda	arg2
 	and	arg1
 	cmp	arg2
-	bne	Le570
+	bne	Le58b
 	lda	arg2+1
 	and	arg1+1
 	cmp	arg2+1
-	bne	Le570
-Le583:	jmp	predicate_true
+	bne	Le58b
+Le59e:	jmp	predicate_true
 
 
 op_or:	lda	arg1
@@ -3607,7 +3438,9 @@ op_or:	lda	arg1
 	tax
 	lda	arg1+1
 	ora	arg2+1
-	jmp	store_result_ax
+Le5aa:	stx	acc
+	sta	acc+1
+	jmp	store_result
 
 
 op_and:	lda	arg1
@@ -3615,7 +3448,7 @@ op_and:	lda	arg1
 	tax
 	lda	arg1+1
 	and	arg2+1
-	jmp	store_result_ax
+	jmp	Le5aa
 
 
 op_test_attr:
@@ -3626,7 +3459,7 @@ op_test_attr:
 	lda	Z71
 	and	Z6f
 	ora	Z72
-	bne	Le583
+	bne	Le59e
 	jmp	predicate_false
 
 
@@ -3664,7 +3497,7 @@ op_store:
 	lda	arg2+1
 	sta	acc+1
 	lda	arg1
-	jmp	Le10d
+	jmp	Le173
 
 
 op_insert_obj:
@@ -3707,24 +3540,24 @@ op_insert_obj:
 
 
 op_loadw:
-	jsr	Se643
+	jsr	Se662
 	jsr	fetch_aux_byte
-Le632:	sta	acc+1
+Le651:	sta	acc+1
 	jsr	fetch_aux_byte
 	sta	acc
 	jmp	store_result
 
 
 op_loadb:
-	jsr	Se647
+	jsr	Se666
 	lda	#$00
-	beq	Le632
+	beq	Le651
 
 
-Se643:	asl	arg2
+Se662:	asl	arg2
 	rol	arg2+1
 
-Se647:	lda	arg2
+Se666:	lda	arg2
 	clc
 	adc	arg1
 	sta	aux_ptr
@@ -3738,12 +3571,12 @@ Se647:	lda	arg2
 
 
 op_get_prop:
-	jsr	Sf1e3
-.loop1:	jsr	Sf201
+	jsr	Sf56c
+.loop1:	jsr	Sf58a
 	cmp	arg2
 	beq	.fwd2
 	bcc	.fwd1
-	jsr	Sf230
+	jsr	Sf5b9
 	jmp	.loop1
 
 .fwd1:	lda	arg2
@@ -3758,7 +3591,7 @@ op_get_prop:
 	sta	acc
 	jmp	store_result
 
-.fwd2:	jsr	Sf206
+.fwd2:	jsr	Sf58f
 	iny
 	cmp	#$01
 	beq	.fwd3
@@ -3782,54 +3615,40 @@ op_get_prop:
 
 
 op_get_prop_addr:
-	if	iver==iver2a
-
-	jsr	Sf1e3
-.loop1:	jsr	Sf201
-	cmp	arg2
-	beq	.fwd1
-	bcc	Le6ce
-	jsr	Sf230
-	jmp	.loop1
-
-.fwd1:	jsr	Sf206
-
-	else
-
 	lda	arg1
 	ldx	arg1+1
 	jsr	setup_object
 	ldy	#$0c
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	clc
 	adc	Z81
 	tax
 	iny
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	sta	Z6d
 	stx	Z6e
 	ldy	#$00
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	asl
 	tay
 	iny
 .loop2b:
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	and	#$3f
 	cmp	arg2
 	beq	.fwd8b
 	bcs	.fwd2b
-	jmp	Le6ce
+	jmp	Le751
 
-.fwd2b:	lda	(Z6d),Y
+.fwd2b:	lda	(Z6d),y
 	and	#$80
 	beq	.fwd3b
 	iny
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	and	#$3f
 	jmp	.fwd5b
 
-.fwd3b:	lda	(Z6d),Y
+.fwd3b:	lda	(Z6d),y
 	and	#$40
 	beq	.fwd4b
 	lda	#$02
@@ -3853,15 +3672,15 @@ op_get_prop_addr:
 .fwd7b:	ldy	#$00
 	jmp	.loop2b
 
-.fwd8b:	lda	(Z6d),Y
+.fwd8b:	lda	(Z6d),y
 	and	#$80
 	beq	.fwd9b
 	iny
-	lda	(Z6d),Y
+	lda	(Z6d),y
 	and	#$3f
 	jmp	.fwd11b
 
-.fwd9b:	lda	(Z6d),Y
+.fwd9b:	lda	(Z6d),y
 	and	#$40
 	beq	.fwd10b
 	lda	#$02
@@ -3870,9 +3689,6 @@ op_get_prop_addr:
 .fwd10b:
 	lda	#$01
 .fwd11b:
-
-	endif
-
 	iny
 	tya
 	clc
@@ -3885,152 +3701,148 @@ op_get_prop_addr:
 	sta	acc+1
 	jmp	store_result
 
-Le6ce:	jmp	store_result_zero
+Le751:	jmp	store_result_zero
 
 
 op_get_next_prop:
-	jsr	Sf1e3
+	jsr	Sf56c
 	lda	arg2
 	beq	.fwd2
-.loop1:	jsr	Sf201
+.loop1:	jsr	Sf58a
 	cmp	arg2
 	beq	.fwd1
-	bcc	Le6ce
-	jsr	Sf230
+	bcc	Le751
+	jsr	Sf5b9
 	jmp	.loop1
 
-.fwd1:	jsr	Sf21e
-.fwd2:	jsr	Sf201
+.fwd1:	jsr	Sf5a7
+.fwd2:	jsr	Sf58a
 	ldx	#$00
 	jmp	store_result_xa
 
 
-op_add:
-	lda	arg1
+op_add:	lda	arg1
 	clc
 	adc	arg2
 	tax
 	lda	arg1+1
 	adc	arg2+1
-	jmp	store_result_ax
+	jmp	Le5aa
 
 
-op_sub:
-	lda	arg1
+op_sub:	lda	arg1
 	sec
 	sbc	arg2
 	tax
 	lda	arg1+1
 	sbc	arg2+1
-	jmp	store_result_ax
+	jmp	Le5aa
 
 
-op_mul:	jsr	Se7c6
-.loop1:	ror	Zcc
-	ror	Zcb
+op_mul:	jsr	Se849
+.loop1:	ror	Zd1
+	ror	Zd0
 	ror	arg2+1
 	ror	arg2
 	bcc	.fwd1
 	lda	arg1
 	clc
-	adc	Zcb
-	sta	Zcb
+	adc	Zd0
+	sta	Zd0
 	lda	arg1+1
-	adc	Zcc
-	sta	Zcc
+	adc	Zd1
+	sta	Zd1
 .fwd1:	dex
 	bpl	.loop1
 	ldx	arg2
 	lda	arg2+1
-	jmp	store_result_ax
+	jmp	Le5aa
 
 
-op_div:
-	jsr	divide
-	ldx	Zc7
-	lda	Zc7+1
-	jmp	store_result_ax
+op_div:	jsr	divide
+	ldx	Zcc
+	lda	Zcc+1
+	jmp	Le5aa
 
 
-op_mod:
-	jsr	divide
-	ldx	Zc9
-	lda	Zc9+1
-	jmp	store_result_ax
+op_mod:	jsr	divide
+	ldx	Zce
+	lda	Zce+1
+	jmp	Le5aa
 
 
-; On exit
-;   quotient in Zc7
-;   remainder in Zc9
+; On exit:
+;   quotient in Zcc
+;   remainder in Zce
 divide:	lda	arg1+1
-	sta	Zce
+	sta	Zd3
 	eor	arg2+1
-	sta	Zcd
+	sta	Zd2
 	lda	arg1
-	sta	Zc7
+	sta	Zcc
 	lda	arg1+1
-	sta	Zc7+1
+	sta	Zcc+1
 	bpl	.fwd1
-	jsr	Se782
+	jsr	Se805
 .fwd1:	lda	arg2
-	sta	Zc9
+	sta	Zce
 	lda	arg2+1
-	sta	Zc9+1
+	sta	Zce+1
 	bpl	.fwd2
-	jsr	Se774
-.fwd2:	jsr	Se790
-	lda	Zcd
+	jsr	Se7f7
+.fwd2:	jsr	Se813
+	lda	Zd2
 	bpl	.fwd3
-	jsr	Se782
-.fwd3:	lda	Zce
-	bpl	Le781
+	jsr	Se805
+.fwd3:	lda	Zd3
+	bpl	Le804
 
 
-Se774:	lda	#$00
+Se7f7:	lda	#$00
 	sec
-	sbc	Zc9
-	sta	Zc9
+	sbc	Zce
+	sta	Zce
 	lda	#$00
-	sbc	Zc9+1
-	sta	Zc9+1
-Le781:	rts
+	sbc	Zce+1
+	sta	Zce+1
+Le804:	rts
 
 
-Se782:	lda	#$00
+Se805:	lda	#$00
 	sec
-	sbc	Zc7
-	sta	Zc7
+	sbc	Zcc
+	sta	Zcc
 	lda	#$00
-	sbc	Zc7+1
-	sta	Zc7+1
+	sbc	Zcc+1
+	sta	Zcc+1
 	rts
 
 
-Se790:	lda	Zc9
-	ora	Zc9+1
+Se813:	lda	Zce
+	ora	Zce+1
 	beq	int_err_08
-	jsr	Se7c6
-.loop1:	rol	Zc7
-	rol	Zc7+1
-	rol	Zcb
-	rol	Zcc
-	lda	Zcb
+	jsr	Se849
+.loop1:	rol	Zcc
+	rol	Zcc+1
+	rol	Zd0
+	rol	Zd1
+	lda	Zd0
 	sec
-	sbc	Zc9
+	sbc	Zce
 	tay
-	lda	Zcc
-	sbc	Zc9+1
+	lda	Zd1
+	sbc	Zce+1
 	bcc	.fwd1
-	sty	Zcb
-	sta	Zcc
+	sty	Zd0
+	sta	Zd1
 .fwd1:	dex
 	bne	.loop1
-	rol	Zc7
-	rol	Zc7+1
-	lda	Zcb
-	sta	Zc9
-	lda	Zcc
-	sta	Zc9+1
+	rol	Zcc
+	rol	Zcc+1
+	lda	Zd0
+	sta	Zce
+	lda	Zd1
+	sta	Zce+1
 	rts
 
 
@@ -4039,12 +3851,20 @@ int_err_08:
 	jmp	int_error
 
 
-Se7c6:	ldx	#$10
+Se849:	ldx	#$10
 	lda	#$00
-	sta	Zcb
-	sta	Zcc
+	sta	Zd0
+	sta	Zd1
 	clc
 	rts
+
+
+op_throw:
+	lda	arg2
+	sta	Zf2
+	lda	arg2+1
+	sta	Zf2+1
+	jmp	op_ret
 
 
 op_je:	dec	argcnt
@@ -4076,21 +3896,43 @@ op_je:	dec	argcnt
 .rtn_f:	jmp	predicate_false
 
 
+; call instructions that do not store a result
+op_call_1n:
+op_call_2n:
+op_call_vn:
+op_call_vn2:
+	lda	#$01
+	sta	call_store_result_flag
+	bne	Le89d
+
+
 ; call instructions that store a result
-op_call_1s
+op_call_1s:
 op_call_2s:
 op_call_vs:
-op_call_vs2:
-	lda	arg1
+op_call_vs2
+	lda	#$00
+	sta	call_store_result_flag
+
+Le89d:	lda	arg1
 	ora	arg1+1
-	bne	.fwd1
-	ldx	#$00
+	bne	do_call
+	lda	call_store_result_flag
+	beq	.fwd1
+	rts
+
+.fwd1:	ldx	#$00
 	jmp	store_result_xa
 
-.fwd1:	ldx	Zed
-	lda	Zed+1
+
+; do_call is extracted from op_call because in Z-machine architecture v5,
+; main procdure is called at game startup
+do_call:
+	ldx	Zf2
+	lda	Zf2+1
 	jsr	push_ax
 	lda	pc
+	ldx	call_store_result_flag
 	jsr	push_ax
 	ldx	pc+1
 	lda	pc+2
@@ -4118,21 +3960,24 @@ op_call_vs2:
 	ldx	local_vars,y
 	lda	local_vars+1,y
 	jsr	push_ax
-	jsr	fetch_pc_byte
-	sta	Z6e
-	jsr	fetch_pc_byte
 	ldy	Z6d
+	lda	#$00
 	sta	local_vars,y
-	lda	Z6e
 	sta	local_vars+1,y
 	iny
 	iny
 	sty	Z6d
 	dec	Z6f
 	bne	.loop1
+	
+
+.fwd2:	lda	Dfdef
+	jsr	push_ax
 
 ; if present, copy arg2 through arg8 to the first local variables
-.fwd2:	dec	argcnt
+	dec	argcnt
+	lda	argcnt
+	sta	Dfdef
 	beq	.fwd3
 
 	lda	arg2
@@ -4186,29 +4031,29 @@ op_call_vs2:
 	txa
 	jsr	push_ax
 	lda	stk_ptr+1
-	sta	Zed+1
+	sta	Zf2+1
 	lda	stk_ptr
-	sta	Zed
+	sta	Zf2
 	rts
 
 
 op_storew:
 	asl	arg2
 	rol	arg2+1
-	jsr	Se8f4
+	jsr	Se99a
 	lda	arg3+1
 	sta	(Z6d),y
 	iny
-	bne	Le8ef
+	bne	Le995
 
 op_storeb:
-	jsr	Se8f4
-Le8ef:	lda	arg3
+	jsr	Se99a
+Le995:	lda	arg3
 	sta	(Z6d),y
 	rts
 
 
-Se8f4:	lda	arg2
+Se99a:	lda	arg2
 	clc
 	adc	arg1
 	sta	Z6d
@@ -4222,15 +4067,15 @@ Se8f4:	lda	arg2
 
 
 op_put_prop:
-	jsr	Sf1e3
-.loop1:	jsr	Sf201
+	jsr	Sf56c
+.loop1:	jsr	Sf58a
 	cmp	arg2
 	beq	.fwd1
 	bcc	int_err_0a
-	jsr	Sf230
+	jsr	Sf5b9
 	jmp	.loop1
 
-.fwd1:	jsr	Sf206
+.fwd1:	jsr	Sf58f
 	iny
 	cmp	#$01
 	beq	.fwd2
@@ -4256,43 +4101,43 @@ int_err_0b:
 
 op_print_char:
 	lda	arg1
-	jmp	Sf311
+	jmp	Sf69a
 
 
 op_print_num:
 	lda	arg1
-	sta	Zc7
+	sta	Zcc
 	lda	arg1+1
-	sta	Zc7+1
-	lda	Zc7+1
+	sta	Zcc+1
+	lda	Zcc+1
 	bpl	.fwd1
 	lda	#$2d
-	jsr	Sf311
-	jsr	Se782
+	jsr	Sf69a
+	jsr	Se805
 .fwd1:	lda	#$00
-	sta	Zcf
-.loop1:	lda	Zc7
-	ora	Zc7+1
+	sta	Zd4
+.loop1:	lda	Zcc
+	ora	Zcc+1
 	beq	.fwd2
 	lda	#$0a
-	sta	Zc9
+	sta	Zce
 	lda	#$00
-	sta	Zc9+1
-	jsr	Se790
-	lda	Zc9
+	sta	Zce+1
+	jsr	Se813
+	lda	Zce
 	pha
-	inc	Zcf
+	inc	Zd4
 	bne	.loop1
-.fwd2:	lda	Zcf
+.fwd2:	lda	Zd4
 	bne	.loop2
 	lda	#$30
-	jmp	Sf311
+	jmp	Sf69a
 
 .loop2:	pla
 	clc
 	adc	#$30
-	jsr	Sf311
-	dec	Zcf
+	jsr	Sf69a
+	dec	Zd4
 	bne	.loop2
 	rts
 
@@ -4301,70 +4146,62 @@ op_random:
 	lda	arg1
 	ora	arg1+1
 	bne	.fwd1
-	sta	Ze8
-	sta	Ze8+1
+	sta	Zed
+	sta	Zed+1
 	jmp	store_result_zero
 
-.fwd1:	lda	Ze8
-	ora	Ze8+1
+.fwd1:	lda	Zed
+	ora	Zed+1
 	bne	.fwd3
 	lda	arg1+1
 	bpl	.fwd2
 	eor	#$ff
-	sta	Ze8+1
+	sta	Zed+1
 	lda	arg1
 	eor	#$ff
-	sta	Ze8
-	inc	Ze8
+	sta	Zed
+	inc	Zed
 	lda	#$00
-	sta	Zc0
-	sta	Zc0+1
+	sta	Zc5
+	sta	Zc5+1
 	beq	.fwd3		; always taken
 
 .fwd2:	lda	arg1
 	sta	arg2
 	lda	arg1+1
 	sta	arg2+1
-	jsr	Sf2ff
+	jsr	Sf688
 	stx	arg1
 	and	#$7f
 	sta	arg1+1
 	jsr	divide
-	lda	Zc9
+	lda	Zce
 	clc
 	adc	#$01
 	sta	acc
-	lda	Zc9+1
+	lda	Zce+1
 	adc	#$00
 	sta	acc+1
 	jmp	store_result
 
-.fwd3:
-	if	iver>=iver2b
-	lda	arg1
-	sta	Ze8
-	lda	arg1+1
-	sta	Ze8+1
-	endif
-
-	lda	Zc0+1
-	cmp	Ze8+1
+.fwd3:	lda	Zc5+1
+	cmp	Zed+1
 	bcc	.fwd4
-	lda	Zc0
-	cmp	Ze8
+	lda	Zc5
+	cmp	Zed
 	bcc	.fwd4
 	beq	.fwd4
 	lda	#$01
-	sta	Zc0
+	sta	Zc5
 	lda	#$00
-	sta	Zc0+1
-.fwd4:	lda	Zc0
+	sta	Zc5+1
+.fwd4:	lda	Zc5
 	sta	acc
-	lda	Zc0+1
+	lda	Zc5+1
 	sta	acc+1
-	inc	Zc0
+	inc	Zc5
 	bne	.fwd5
-	inc	Zc0+1
+	inc	Zc5+1
 .fwd5:	jmp	store_result
 
 
@@ -4377,219 +4214,542 @@ op_push:
 op_pull:
 	jsr	pop_acc
 	lda	arg1
-	jmp	Le10d
+	jmp	Le173
 
 
 op_scan_table:
-	lda	arg2
+	lda	arg3+1
+	bmi	.fwd3
+	ora	arg3
+	beq	.fwd3
+	lda	argcnt
+	cmp	#$04
+	beq	.fwd0
+.loop0:	lda	#$82
+	sta	arg4
+.fwd0:	lda	arg4
+	beq	.loop0
+	lda	#$00
+	asl	arg4
+	rol
+	lsr	arg4
+	sta	Dfdee
+	lda	Dfdee
+	bne	.fwd5
+	lda	arg1
+	sta	arg1+1
+.fwd5:	lda	arg2
 	sta	aux_ptr
 	lda	arg2+1
 	sta	aux_ptr+1
 	lda	#$00
 	sta	aux_ptr+2
 	jsr	find_aux_page
-.loop1:	jsr	fetch_aux_byte
-	sta	Z6e
+.loop1:	lda	aux_ptr
+	fcb	$8d		; sta absolute
+	fdb	Z70
+	lda	aux_ptr+1
+	fcb	$8d		; sta absolute
+	fdb	Z71
+	lda	aux_ptr+2
+	fcb	$8d		; sta absolute
+	fdb	Z72
+	jsr	fetch_aux_byte
+	cmp	arg1+1
+	bne	.fwd6
+	lda	Dfdee
+	beq	.fwd4
 	jsr	fetch_aux_byte
 	cmp	arg1
-	bne	.fwd1
-	lda	Z6e
-	cmp	arg1+1
-	beq	.fwd2
+	beq	.fwd4
+.fwd6:	fcb	$ad		; lda absolute
+	fdb	Z70
+	clc
+	adc	arg4
+	sta	aux_ptr
+	bcc	.fwd1
+	fcb	$ad		; lda absolute
+	fdb	Z71
+	adc	#$00
+	sta	aux_ptr+1
+	fcb	$ad		; lda absolute
+	fdb	Z72
+	adc	#$00
+	sta	aux_ptr+2
+	jsr	find_aux_page
 .fwd1:	dec	arg3
 	bne	.loop1
 	lda	arg3+1
-	beq	.fwd4
+	beq	.fwd3
 	dec	arg3+1
-	jmp	.loop1
+	bne	.loop1		; always taken
 
-.fwd2:	sec
-	lda	aux_ptr
-	if	iver<=iver2c
-	sbc	#$01
-	else
-	sbc	#$02
-	endif
-	sta	aux_ptr
-	bcs	.fwd3
-	dec	aux_ptr+1
-.fwd3:	sta	acc
-	lda	aux_ptr+1
-	sta	acc+1
-	jsr	store_result
-	jmp	predicate_true
-
-.fwd4:	lda	#$00
+.fwd3:	lda	#$00
 	sta	acc
 	sta	acc+1
 	jsr	store_result
 	jmp	predicate_false
 
+.fwd4:	fcb	$ad		; lda absolute
+	fdb	Z70
+	sta	acc
+	fcb	$ad	; lda absolute
+	fdb	Z71
+	sta	acc+1
+	jsr	store_result
+	jmp	predicate_true
 
-op_sread:
+
+op_not:	lda	arg1
+	eor	#$ff
+	sta	acc
 	lda	arg1+1
+	eor	#$ff
+	sta	acc+1
+	jmp	store_result
+
+
+op_copy_table:
+	lda	arg2
+	ora	arg2+1
+	bne	.fwd1
+	jmp	.fwd9
+.fwd1:	lda	arg3+1
+	cmp	#$7f
+	bcc	.fwd2
+	jmp	.fwd10
+
+.fwd2:	lda	arg1+1
+	cmp	arg2+1
+	bcc	.fwd4
+	beq	.fwd3
+	jmp	.fwd5
+
+.fwd3:	lda	arg1
+	cmp	arg2
+	beq	.fwd4
+	bcs	.fwd5
+.fwd4:	lda	arg1
 	clc
-	adc	Z81
-	sta	Zc4
+	adc	arg3
+	sta	Z6d
+	lda	arg1+1
+	adc	arg3+1
+	cmp	arg2+1
+	bcc	.fwd5
+	bne	.fwd6
+	lda	Z6d
+	cmp	arg2
+	beq	.fwd5
+	bcs	.fwd6
+.fwd5:	lda	#$00
+	sta	aux_ptr+2
+	lda	arg1+1
+	sta	aux_ptr+1
 	lda	arg1
-	sta	Zc3
+	sta	aux_ptr
+	jsr	find_aux_page
+	lda	arg2
+	sta	Z6d
 	lda	arg2+1
 	clc
 	adc	Z81
-	sta	Zc6
-	lda	arg2
-	sta	Zc5
-	ldy	#$00
-	lda	(Zc3),y
-	cmp	#$4f
-	bcc	.fwd1
-	lda	#$4e
-.fwd1:	sta	Zbe
-	jsr	Sdafe
-	sta	Z9f
-	lda	#$00
-	sta	Za0
-	ldy	#$01
-	sta	(Zc5),y
-	sty	Z9d
-	iny
-	sty	Z9e
-.loop1:	ldy	#$00
-	lda	(Zc5),y
-	beq	.fwd2
-
-	if	iver==iver2a
-	cmp	#$3c
-	else
-	cmp	#$3b
-	endif
-
-	bcc	.fwd3
-
-.fwd2:
-	if	iver==iver2a
-	lda	#$3b
-	else
-	lda	#$3a
-	endif
-
-	sta	(Zc5),y
-.fwd3:	iny
-	cmp	(Zc5),y
+	sta	Z6e
+	lda	arg3
+	sta	Z6f
+	lda	arg3+1
+	sta	Z70
+.loop1:	jsr	Sf0fb
 	bcc	.rtn
-	lda	Z9f
-	ora	Za0
-	bne	.fwd4
+	jsr	fetch_aux_byte
+	ldy	#$00
+	sta	(Z6d),y
+	inc	Z6d
+	bne	.loop1
+	inc	Z6e
+	jmp	.loop1
+
 .rtn:	rts
 
-.fwd4:	lda	Za0
+.fwd6:	lda	arg3
+	sta	Z6f
+	lda	arg3+1
+	sta	Z70
+	jsr	Sf0fb
+	lda	arg1
+	clc
+	adc	Z6f
+	sta	Z6d
+	lda	arg1+1
+	adc	Z70
+	clc
+	adc	Z81
+	sta	Z6e
+	lda	arg2
+	clc
+	adc	Z6f
+	sta	Z71
+	lda	arg2+1
+	adc	Z70
+	clc
+	adc	Z81
+	sta	Z72
+.loop2:	ldy	#$00
+	lda	(Z6d),y
+	sta	(Z71),y
+	lda	Z6d
+	bne	.fwd7
+	dec	Z6e
+.fwd7:	dec	Z6d
+	lda	Z71
+	bne	.fwd8
+	dec	Z72
+.fwd8:	dec	Z71
+	jsr	Sf0fb
+	bcs	.loop2
+	rts
+
+.fwd9:	lda	arg1
+	sta	Z6d
+	lda	arg1+1
+	clc
+	adc	Z81
+	sta	Z6e
+	lda	arg3
+	sta	Z6f
+	lda	arg3+1
+	sta	Z70
+	ldy	#$00
+.loop3:	jsr	Sf0fb
+	bcc	.rtn2
+	lda	#$00
+	sta	(Z6d),y
+	iny
+	bne	.loop3
+	inc	Z6e
+	jmp	.loop3
+
+.rtn2:	rts
+
+.fwd10:	lda	arg3
+	eor	#$ff
+	sta	arg3
+	lda	arg3+1
+	eor	#$ff
+	sta	arg3+1
+	inc	arg3
+	bne	.fwd11
+	inc	arg3+1
+.fwd11:	jmp	.fwd5
+
+
+op_check_arg_count:
+	lda	arg1
+	cmp	Dfdef
+	bcc	.rtn_t
+	beq	.rtn_t
+	jmp	predicate_false
+
+.rtn_t:	jmp	predicate_true
+
+
+op_log_shift:
+	lda	arg1
+	sta	acc
+	lda	arg1+1
+	sta	acc+1
+	lda	arg2
+	cmp	#$80
+	bcs	.fwd1
+	tay
+.loop1:	asl	acc
+	rol	acc+1
+	dey
+	bne	.loop1
+	jmp	store_result
+
+.fwd1:	eor	#$ff
+	tay
+.loop2:	lsr	acc+1
+	ror	acc
+	dey
+	bpl	.loop2
+	jmp	store_result
+
+
+op_art_shift:
+	lda	arg2
+	cmp	#$80
+	bcc	op_log_shift
+	ldx	arg1
+	stx	acc
+	ldx	arg1+1
+	stx	acc+1
+	eor	#$ff
+	tay
+.loop1:	lda	arg1+1
+	asl
+	ror	acc+1
+	ror	acc
+	dey
+	bpl	.loop1
+	jmp	store_result
+
+
+op_aread:
+	lda	arg1+1
+	clc
+	adc	Z81
+	sta	Zc9
+	lda	arg1
+	sta	Zc8
+	lda	#$00
+	sta	Zb2
+	sta	Zb3
+	ldx	argcnt
+	dex
+	beq	.fwd1
+	ldx	#$00
+	lda	arg2+1
+	ora	arg2
+	beq	.fwd1
+	lda	arg2+1
+	clc
+	adc	Z81
+	sta	Zcb
+	lda	arg2
+	sta	Zca
+	ldx	#$01
+.fwd1:	stx	Dfdf1
+	jsr	Sfada
+	lda	Dfdf1
+	beq	.fwd2
+	jsr	Secec
+.fwd2:	lda	#$f0
+	sta	Dfdf1
+	lda	Dfdf0
+	ldx	#$00
+	jmp	store_result_xa
+
+
+; core of aread and tokenize
+Secec:	ldy	#$01
+	lda	(Zc8),y
+	sta	Za1
+	lda	#$00
+	sta	Za2
+	sta	(Zca),y
+	iny
+	sty	Z9f
+	sty	Za0
+.loop1:	ldy	#$00
+	lda	(Zca),y
+	beq	.fwd1
+	cmp	#$3b
+	bcc	.fwd2
+.fwd1:	lda	#$3a
+	sta	(Zca),y
+.fwd2:	iny
+	cmp	(Zca),y
+	bcc	.rtn
+	lda	Za1
+	ora	Za2
+	bne	.fwd3
+.rtn:	rts
+
+.fwd3:	lda	Za2
 	cmp	#$09
-	bcc	.fwd5
-	jsr	Seb3e
-.fwd5:	lda	Za0
-	bne	.fwd6
+	bcc	.fwd4
+	jsr	See46
+.fwd4:	lda	Za2
+	bne	.fwd5
 	ldx	#$08
-.loop2:	sta	Z8b,x
+.loop2:	sta	Z8d,x
 	dex
 	bpl	.loop2
-	jsr	Seb30
-	lda	Z9d
+	jsr	See38
+	lda	Z9f
 	ldy	#$03
-	sta	(Za1),y
+	sta	(Za3),y
 	tay
-	lda	(Zc3),y
-	jsr	Seb6b
+	lda	(Zc8),y
+	jsr	See74
+	bcs	.fwd6
+	jsr	See68
+	bcc	.fwd5
+	inc	Z9f
+	dec	Za1
+	jmp	.loop1
+
+.fwd5:	lda	Za1
+	beq	.fwd7
+	ldy	Z9f
+	lda	(Zc8),y
+	jsr	See63
 	bcs	.fwd7
-	jsr	Seb5f
-	bcc	.fwd6
-	inc	Z9d
-	dec	Z9f
+	ldx	Za2
+	sta	Z8d,x
+	dec	Za1
+	inc	Za2
+	inc	Z9f
 	jmp	.loop1
 
-.fwd6:	lda	Z9f
-	beq	.fwd8
-	ldy	Z9d
-	lda	(Zc3),y
-	jsr	Seb5a
-	bcs	.fwd8
-	ldx	Za0
-	sta	Z8b,x
-	dec	Z9f
-	inc	Za0
-	inc	Z9d
-	jmp	.loop1
-
-.fwd7:	sta	Z8b
-	dec	Z9f
-	inc	Za0
-	inc	Z9d
-.fwd8:	lda	Za0
+.fwd6:	sta	Z8d
+	dec	Za1
+	inc	Za2
+	inc	Z9f
+.fwd7:	lda	Za2
 	beq	.loop1
-	jsr	Seb30
-	lda	Za0
+	jsr	See38
+	lda	Za2
 	ldy	#$02
-	sta	(Za1),y
-	jsr	Sf0ac
-	jsr	Seb96
+	sta	(Za3),y
+	jsr	Sf435
+	jsr	See9f
 	ldy	#$01
-	lda	(Zc5),y
+	lda	(Zca),y
 	clc
 	adc	#$01
-	sta	(Zc5),y
-	jsr	Seb30
+	sta	(Zca),y
 	ldy	#$00
-	sty	Za0
+	sty	Za2
+	lda	Zb2
+	beq	.fwd8
 	lda	acc+1
-	sta	(Za1),y
+	ora	acc
+	beq	.fwd9
+.fwd8:	lda	acc+1
+	sta	(Za3),y
 	iny
 	lda	acc
-	sta	(Za1),y
-	lda	Z9e
+	sta	(Za3),y
+.fwd9:	lda	Za0
 	clc
 	adc	#$04
-	sta	Z9e
+	sta	Za0
 	jmp	.loop1
 
 
-Seb30:	lda	Zc5
+op_tokenise:
+	lda	arg1+1
 	clc
-	adc	Z9e
+	adc	Z81
+	sta	Zc9
+	lda	arg1
+	sta	Zc8
+	lda	arg2+1
+	clc
+	adc	Z81
+	sta	Zcb
+	lda	arg2
+	sta	Zca
+	dec	argcnt
+	dec	argcnt
+	beq	.fwd2
+	lda	#$01
+	sta	Zb3
+	lda	#$00
+	dec	argcnt
+	beq	.fwd1
+	lda	#$01
+.fwd1:	sta	Zb2
+	jmp	.fwd3
+
+.fwd2:	lda	#$00
+	sta	Zb3
+	sta	Zb2
+.fwd3:	jmp	Secec
+
+
+op_encode_text:
+	lda	arg1+1
+	clc
+	adc	Z81
+	sta	Zc9
+	lda	arg1
+	sta	Zc8
+	lda	arg3
+	clc
+	adc	Zc8
+	sta	Zc8
+	lda	arg3+1
+	adc	Zc9
+	sta	Zc9
+	lda	arg4+1
+	clc
+	adc	Z81
+	sta	Zcb
+	lda	arg4
+	sta	Zca
+	lda	#$09
 	sta	Za1
-	lda	Zc6
-	adc	#$00
+	lda	#$00
 	sta	Za2
+	ldx	#$08
+.loop1:	sta	Z8d,x
+	dex
+	bpl	.loop1
+.loop2:	ldy	Za2
+	lda	(Zc8),y
+	jsr	See63
+	bcs	.fwd1
+	ldy	Za2
+	lda	(Zc8),y
+	ldx	Za2
+	sta	Z8d,x
+	inc	Za2
+	dec	Za1
+	bne	.loop2
+.fwd1:	lda	Za2
+	beq	.rtn
+	jsr	Sf435
+	ldy	#$05
+.loop3:	lda	Z96,y
+	sta	(Zca),y
+	dey
+	bpl	.loop3
+.rtn:	rts
+
+
+See38:	lda	Zca
+	clc
+	adc	Za0
+	sta	Za3
+	lda	Zcb
+	adc	#$00
+	sta	Za4
 	rts
 
 
-Seb3e:	lda	Z9f
+See46:	lda	Za1
 	beq	.rtn
-	ldy	Z9d
-	lda	(Zc3),y
-	jsr	Seb5a
+	ldy	Z9f
+	lda	(Zc8),y
+	jsr	See63
 	bcs	.rtn
-	dec	Z9f
-	inc	Za0
-	inc	Z9d
-	bne	Seb3e
+	dec	Za1
+	inc	Za2
+	inc	Z9f
+	bne	See46
 .rtn:	rts
 
 
-Deb54:	fcb	$21,$3f,$2c,$2e,$0d,$20      	; "!?,.. "
+Dee5c:	fcb	$21,$3f,$2c,$2e,$0d,$20,$00   	; "!?,.. ."
 
 
-Seb5a:	jsr	Seb6b
-	bcs	Leb94
+See63:	jsr	See74
+	bcs	Lee9d
 
-Seb5f:	ldx	#$05
-.loop1:	cmp	Deb54,x
-	beq	Leb94
+See68:	ldx	#$06
+.loop1:	cmp	Dee5c,x
+	beq	Lee9d
 	dex
 	bpl	.loop1
 	clc
 	rts
 
 
-Seb6b:	sta	Zd7
+See74:	sta	Zdc
 	lda	hdr_vocab
 	ldy	hdr_vocab+1
 	sta	aux_ptr+1
@@ -4600,22 +4760,27 @@ Seb6b:	sta	Zd7
 	jsr	fetch_aux_byte
 	sta	Z6f
 .loop1:	jsr	fetch_aux_byte
-	cmp	Zd7
+	cmp	Zdc
 	beq	.fwd1
 	dec	Z6f
 	bne	.loop1
-	lda	Zd7
+	lda	Zdc
 	clc
 	rts
 
-.fwd1:	lda	Zd7
-Leb94:	sec
+.fwd1:	lda	Zdc
+Lee9d:	sec
 	rts
 
 
-Seb96:	lda	hdr_vocab
+See9f:	lda	Zb3
+	beq	.fwd0
+	lda	arg3+1
+	ldy	arg3
+	jmp	.fwd0a
+.fwd0:	lda	hdr_vocab
 	ldy	hdr_vocab+1
-	sta	aux_ptr+1
+.fwd0a:	sta	aux_ptr+1
 	sty	aux_ptr
 	lda	#$00
 	sta	aux_ptr+2
@@ -4628,60 +4793,60 @@ Seb96:	lda	hdr_vocab
 	inc	aux_ptr+1
 .fwd1:	jsr	find_aux_page
 	jsr	fetch_aux_byte
-	sta	Za5
+	sta	Za7
 	sta	Z6d
 	lda	#$00
 	sta	Z6e
 	sta	Z6f
 	jsr	fetch_aux_byte
-	sta	Za4
+	sta	Za6
 	jsr	fetch_aux_byte
-	sta	Za3
-	lda	#$00
-	sta	Zf4
-	sta	Zf5
-	sta	Zf6
-	ldx	Za5
+	sta	Za5
+	lda	Za6
+	bpl	.fwd1a
+	jmp	.fwd11
+
+.fwd1a:	lda	#$00
+	sta	Zf9
+	sta	Zfa
+	sta	Zfb
+	ldx	Za7
 .loop1:	clc
-	lda	Zf4
-	adc	Za3
-	sta	Zf4
-	lda	Zf5
-	adc	Za4
-	sta	Zf5
-	lda	Zf6
+	lda	Zf9
+	adc	Za5
+	sta	Zf9
+	lda	Zfa
+	adc	Za6
+	sta	Zfa
+	lda	Zfb
 	adc	#$00
-	sta	Zf6
+	sta	Zfb
 	dex
 	bne	.loop1
 	clc
-	lda	Zf4
+	lda	Zf9
 	adc	aux_ptr
-	sta	Zf4
-	lda	Zf5
+	sta	Zf9
+	lda	Zfa
 	adc	aux_ptr+1
-	sta	Zf5
-	lda	Zf6
+	sta	Zfa
+	lda	Zfb
 	adc	aux_ptr+2
-	sta	Zf6
-
-	if	iver>=iver2b
-	lda	Zf4
+	sta	Zfb
+	lda	Zf9
 	sec
-	sbc	Za5
-	sta	Zf4
-	lda	Zf5
+	sbc	Za7
+	sta	Zf9
+	lda	Zfa
 	sbc	#$00
-	sta	Zf5
-	endif
-
-	lsr	Za4
-	ror	Za3
+	sta	Zfa
+	lsr	Za6
+	ror	Za5
 .loop2:	asl	Z6d
 	rol	Z6e
 	rol	Z6f
-	lsr	Za4
-	ror	Za3
+	lsr	Za6
+	ror	Za5
 	bne	.loop2
 	clc
 	lda	aux_ptr
@@ -4695,7 +4860,7 @@ Seb96:	lda	hdr_vocab
 	sta	aux_ptr+2
 	sec
 	lda	aux_ptr
-	sbc	Za5
+	sbc	Za7
 	sta	aux_ptr
 	bcs	.loop3
 	lda	aux_ptr+1
@@ -4717,14 +4882,6 @@ Seb96:	lda	hdr_vocab
 	sta	Z72
 	jsr	find_aux_page
 	jsr	fetch_aux_byte
-	cmp	Z94
-	bcc	.fwd2
-	bne	.fwd6
-	jsr	fetch_aux_byte
-	cmp	Z95
-	bcc	.fwd2
-	bne	.fwd6
-	jsr	fetch_aux_byte
 	cmp	Z96
 	bcc	.fwd2
 	bne	.fwd6
@@ -4738,6 +4895,14 @@ Seb96:	lda	hdr_vocab
 	bne	.fwd6
 	jsr	fetch_aux_byte
 	cmp	Z99
+	bcc	.fwd2
+	bne	.fwd6
+	jsr	fetch_aux_byte
+	cmp	Z9a
+	bcc	.fwd2
+	bne	.fwd6
+	jsr	fetch_aux_byte
+	cmp	Z9b
 	beq	.fwd10
 	bcs	.fwd6
 .fwd2:	lda	Z70
@@ -4746,46 +4911,25 @@ Seb96:	lda	hdr_vocab
 	sta	aux_ptr
 	lda	Z71
 	adc	Z6e
-
-	if	iver==iver2a
-	sta	aux_ptr+1
-	lda	Z72
-	adc	Z6f
-	sta	aux_ptr+2
-	lda	aux_ptr+2
-	cmp	Zf6
-	else
 	bcs	.fwd5
 	sta	aux_ptr+1
 	lda	#$00
 	sta	aux_ptr+2
 	lda	aux_ptr+1
-	cmp	Zf5
-	endif
-
+	cmp	Zfa
 	beq	.fwd3
 	bcs	.fwd5
 	bcc	.fwd7		; always taken
-
-.fwd3:
-	if	iver==iver2a
-	lda	aux_ptr+1
-	cmp	Zf5
-	beq	.fwd4
-	bcs	.fwd5
-	bcc	.fwd7		; always taken
-	endif
-
-.fwd4:	lda	aux_ptr
-	cmp	Zf4
+.fwd3:	lda	aux_ptr
+	cmp	Zf9
 	bcc	.fwd7
 	beq	.fwd7
 
-.fwd5:	lda	Zf4
+.fwd5:	lda	Zf9
 	sta	aux_ptr
-	lda	Zf5
+	lda	Zfa
 	sta	aux_ptr+1
-	lda	Zf6
+	lda	Zfb
 	sta	aux_ptr+2
 	jmp	.fwd7
 
@@ -4804,7 +4948,7 @@ Seb96:	lda	hdr_vocab
 	lda	Z6e
 	bne	.fwd8
 	lda	Z6d
-	cmp	Za5
+	cmp	Za7
 	bcc	.fwd9
 .fwd8:	jmp	.loop3
 
@@ -4819,8 +4963,59 @@ Seb96:	lda	hdr_vocab
 	sta	acc+1
 	rts
 
+.fwd11:	lda	#$ff
+	eor	Za6
+	sta	Za6
+	lda	#$ff
+	eor	Za5
+	sta	Za5
+	inc	Za5
+	bne	.loop4
+	inc	Za6
+.loop4:	lda	aux_ptr
+	sta	Z70
+	lda	aux_ptr+1
+	sta	Z71
+	lda	aux_ptr+2
+	sta	Z72
+	jsr	fetch_aux_byte
+	cmp	Z96
+	bne	.fwd12
+	jsr	fetch_aux_byte
+	cmp	Z97
+	bne	.fwd12
+	jsr	fetch_aux_byte
+	cmp	Z98
+	bne	.fwd12
+	jsr	fetch_aux_byte
+	cmp	Z99
+	bne	.fwd12
+	jsr	fetch_aux_byte
+	cmp	Z9a
+	bne	.fwd12
+	jsr	fetch_aux_byte
+	cmp	Z9b
+	beq	.fwd10
+.fwd12:	lda	Z70
+	clc
+	adc	Za7
+	sta	aux_ptr
+	bcc	.fwd13
+	lda	Z71
+	adc	#$00
+	sta	aux_ptr+1
+	lda	#$00
+	sta	aux_ptr+2
+	jsr	find_aux_page
+.fwd13:	dec	Za5
+	bne	.loop4
+	lda	Za6
+	beq	.fwd9
+	dec	Za6
+	jmp	.loop4
 
-Secf8:	lda	Z6d
+
+Sf081:	lda	Z6d
 	sta	aux_ptr
 	lda	Z6e
 	sta	aux_ptr+1
@@ -4829,21 +5024,21 @@ Secf8:	lda	Z6d
 	jmp	find_aux_page
 
 
-Ded07:	fcb	$00
-Ded08:	fcb	$00
-Ded09:	fcb	$00
-Ded0a:	fcb	$00
-Ded0b:	fcb	$00
-Ded0c:	fcb	$00
-Ded0d:	fcb	$00
-Ded0e:	fcb	$00
-Ded0f:	fcb	$00
-Ded10:	fcb	$00
-Ded11:	fcb	$00
-Ded12:	fcb	$00
+Df090:	fcb	$00
+Df091:	fcb	$00
+Df092:	fcb	$00
+Df093:	fcb	$00
+Df094:	fcb	$00
+Df095:	fcb	$00
+Df096:	fcb	$00
+Df097:	fcb	$00
+Df098:	fcb	$00
+Df099:	fcb	$00
+Df09a:	fcb	$00
+Df09b:	fcb	$00
 
 
-Led13:	lda	hdr_length+1
+Lf09c:	lda	hdr_length+1
 	sta	Z6f
 	lda	hdr_length
 	ldy	#$05
@@ -4852,48 +5047,42 @@ Led13:	lda	hdr_length+1
 	dey
 	bpl	.loop1
 	sta	Z70
-.loop2:	jsr	Sed72
+.loop2:	jsr	Sf0fb
 	bcc	.rtn
 	jsr	Sd51d
-	lda	Ded07
+	lda	Df090
 	cmp	#$01
 	bne	.loop2
-	lda	Zb3
-
-	if	iver==iver2a
-	cmp	#$95
-	else
+	lda	Zb8
 	cmp	#$96
-	endif
-
 	bne	.loop2
 	lda	#$00
-	sta	Ded07
+	sta	Df090
 	lda	#$00
-	sta	Ded08
-.loop3:	lda	#$09
-	sta	Zb3
-	jsr	Sed72
+	sta	Df091
+.loop3:	lda	#$0a
+	sta	Zb8
+	jsr	Sf0fb
 	bcc	.rtn
 	jsr	Sd51d
-	ldy	#$09
-	lda	Ded08
+	ldy	#$0a
+	lda	Df091
 	ldx	#$01
 	sta	rd_main_ram
-	jsr	S086b
-	inc	Ded08
-	lda	Ded08
+	jsr	S0856
+	inc	Df091
+	lda	Df091
 	cmp	#$4f
 	bcc	.loop3
-	jsr	home
+	jsr	Sdccf
 	lda	#$02
 	sta	cursrv
-	jmp	Sd87e
+	jmp	Sd899
 
 .rtn:	rts
 
 
-Sed72:	lda	Z6f
+Sf0fb:	lda	Z6f
 	sec
 	sbc	#$01
 	sta	Z6f
@@ -4907,35 +5096,21 @@ find_aux_page:
 	lda	aux_ptr+2
 	bne	.fwd2
 	lda	aux_ptr+1
-	cmp	#max_main_ram_pages
+	cmp	#$ad
 	bcs	.fwd1
-	adc	#hdr_arch>>8
+	adc	#$13
 	ldy	#$00
-	beq	.fwd3
+	beq	.fwd3		; always taken
 
-.fwd1:
-; FIXME - not sure how the $a5/$a6 is determined
-	if	iver==iver2a
-	sbc	#$a6
-	else
-	sbc	#$a5
-	endif
-
+.fwd1:	sbc	#$a5
 	ldy	#$01
-	bne	.fwd3
+	bne	.fwd3		; always taken
 .fwd2:	cmp	#$01
 	bne	.fwd4
 	lda	aux_ptr+1
 	cmp	#$3b
 	bcs	.fwd4
-
-; FIXME - not sure how the $5a/$5b is determined
-	if	iver==iver2a
-	adc	#$5a
-	else
 	adc	#$5b
-	endif
-
 	ldy	#$01
 .fwd3:	sty	aux_phys_page+2
 	sta	aux_phys_page+1
@@ -4945,22 +5120,16 @@ find_aux_page:
 	ldy	aux_ptr+1
 	jsr	find_page
 	clc
-
-; FIXME - not sure how the $95/$96 is determined
-	if	iver==iver2a
-	adc	#$95
-	else
 	adc	#$96
-	endif
-
 	sta	aux_phys_page+1
 	ldy	#$01
 	sty	aux_phys_page+2
-	lda	Dee02
+	lda	Df18b
 	beq	.rtn
 	jmp	find_pc_page		; unnecessary, could just fall through
 
 
+; find PC page
 find_pc_page:
 	lda	pc+2
 	bne	.fwd2
@@ -4971,30 +5140,16 @@ find_pc_page:
 	ldy	#$00
 	beq	.fwd3		; always taken
 
-.fwd1:
-; FIXME - not sure how the $a5/$a6 is determined
-	if	iver==iver2a
-	sbc	#$a6
-	else
-	sbc	#$a5
-	endif
-
+.fwd1:	sbc	#$a5		; FIXME - not sure how this is determiend
 	ldy	#$01
 	bne	.fwd3		; always taken
 
 .fwd2:	cmp	#$01
 	bne	.fwd4
 	lda	pc+1
-	cmp	#$3b
+	cmp	#$3b		; FIXME - not sure how this is determiend
 	bcs	.fwd4
-
-; FIXME - not sure how the $5a/$5b is determined
-	if	iver==iver2a
-	adc	#$5a
-	else
-	adc	#$5b
-	endif
-
+	adc	#$5b		; FIXME - not sure how this is determiend
 	ldy	#$01
 .fwd3:	sty	pc_phys_page+2
 	sta	pc_phys_page+1
@@ -5004,64 +5159,57 @@ find_pc_page:
 	ldy	pc+1
 	jsr	find_page
 	clc
-
-; FIXME - not sure how the $95/$96 is determined
-	if	iver==iver2a
-	adc	#$95
-	else
-	adc	#$96
-	endif
-
+	adc	#$96		; FIXME - not sure how this is determiend
 	sta	pc_phys_page+1
 	ldy	#$01
 	sty	pc_phys_page+2
-	lda	Dee02
+	lda	Df18b
 	beq	.rtn
 	jmp	find_aux_page
 
 
-Dee02:	fcb	$00
+Df18b:	fcb	$00
 
 
 find_page:
-	sta	Ded0a
-	sty	Ded09
+	sta	Df093
+	sty	Df092
 	ldx	#$00
-	stx	Dee02
-	jsr	Seed7
+	stx	Df18b
+	jsr	Sf260
 	bcc	.fwd1
-	ldx	Ded0b
-	lda	D0b56,x
-	sta	Ded0b
+	ldx	Df094
+	lda	D0d00,x
+	sta	Df094
 	tax
-	lda	Ded0a
-	sta	D0c56,x
-	lda	Ded09
-	sta	D0cd6,x
+	lda	Df093
+	sta	D0e00,x
+	lda	Df092
+	sta	D0e80,x
 	tay
 	txa
 	pha
-	lda	Ded0a
+	lda	Df093
 	jsr	fetch_page
-	dec	Dee02
+	dec	Df18b
 	pla
 	rts
 
-.fwd1:	sta	Ded0c
-	cmp	Ded0b
+.fwd1:	sta	Df095
+	cmp	Df094
 	bne	.fwd2
 	rts
 
-.fwd2:	ldy	Ded0b
-	lda	D0b56,y
-	sta	Ded0f
-	lda	Ded0c
-	jsr	Seeb9
-	ldy	Ded0b
-	lda	Ded0c
-	jsr	See93
-	lda	Ded0c
-	sta	Ded0b
+.fwd2:	ldy	Df094
+	lda	D0d00,y
+	sta	Df098
+	lda	Df095
+	jsr	Sf242
+	ldy	Df094
+	lda	Df095
+	jsr	Sf21c
+	lda	Df095
+	sta	Df094
 	rts
 
 
@@ -5075,83 +5223,63 @@ fetch_page:
 	sty	disk_block_num
 	txa
 	clc
-
-; FIXME - not sure how the $95/$96 is determined
-	if	iver==iver2a
-	adc	#$95
-	else
-	adc	#$96
-	endif
-
-	sta	Zb3
+	adc	#$96		; FIXME - not sure how this is determined
+	sta	Zb8
 	ldx	#$01
-	stx	Ded07
+	stx	Df090
 	jmp	Sd51d
 
 .fwd2:	tya
 	sec
-	sbc	#$3b
+	sbc	#$3b		; FIXME - not sure how this is determined
 	pha
 	txa
 	clc
-
-	if	iver==iver2a
-	adc	#$95
-	else
-	adc	#$96
-	endif
-
+	adc	#$96		; FIXME - not sure how this is determined
 	tay
 	sta	rd_main_ram
 	ldx	#$01
-	stx	D086a
+	stx	D0855
 	ldx	#$00
 	pla
-	jmp	S086b
+	jmp	S0856
 
 
-See93:	sta	Ded11
-	sty	Ded10
+Sf21c:	sta	Df09a
+	sty	Df099
 	tax
 	tya
-	sta	D0bd6,x
-	lda	D0b56,y
-	sta	Ded12
+	sta	D0d80,x
+	lda	D0d00,y
+	sta	Df09b
 	txa
-	ldx	Ded12
-	sta	D0bd6,x
+	ldx	Df09b
+	sta	D0d80,x
 	txa
-	ldx	Ded11
-	sta	D0b56,x
-	lda	Ded11
-	sta	D0b56,y
+	ldx	Df09a
+	sta	D0d00,x
+	lda	Df09a
+	sta	D0d00,y
 	rts
 
 
-Seeb9:	tax
-	lda	D0b56,x
-	sta	Ded0d
-	lda	D0bd6,x
-	sta	Ded0e
+Sf242:	tax
+	lda	D0d00,x
+	sta	Df096
+	lda	D0d80,x
+	sta	Df097
 	tax
-	lda	Ded0d
-	sta	D0b56,x
-	lda	Ded0e
-	ldx	Ded0d
-	sta	D0bd6,x
+	lda	Df096
+	sta	D0d00,x
+	lda	Df097
+	ldx	Df096
+	sta	D0d80,x
 	rts
 
 
-Seed7:
-; FIXME - not sure how the $2a/$29 is determined
-	if	iver==iver2a
-	ldx	#$2a
-	else
-	ldx	#$29
-	endif
-
-.loop1:	lda	Ded0a
-	cmp	D0c56,x
+Sf260:	ldx	#$29		; FIXME - not sure how this is determined
+.loop1:	lda	Df093
+	cmp	D0e00,x
 	beq	.fwd1
 .loop2:	dex
 	bpl	.loop1
@@ -5159,69 +5287,43 @@ Seed7:
 	rts
 
 .fwd1:	tya
-	cmp	D0cd6,x
+	cmp	D0e80,x
 	bne	.loop2
 	txa
 	clc
 	rts
 
 
-Seeef:
-; FIXME - not sure how the $2a/$29 is determined
-	if	iver==iver2a
-	ldx	#$2a
-	else
-	ldx	#$29
-	endif
-
-	stx	Ded0b
+Sf278:	ldx	#$29		; FIXME - not sure how this is determined
+	stx	Df094
 	lda	#$ff
-.loop1:	sta	D0c56,x
+.loop1:	sta	D0e00,x
 	dex
 	bpl	.loop1
 	ldx	#$00
 	ldy	#$01
 .loop2:	tya
-	sta	D0bd6,x
+	sta	D0d80,x
 	inx
 	iny
-
-; FIXME - not sure how the $2b/$2a is determined
-	if	iver==iver2a
-	cpx	#$2b
-	else
-	cpx	#$2a
-	endif
-
+	cpx	#$2a		; FIXME - not sure how this is determined
 	bcc	.loop2
 	lda	#$00
 	dex
-	sta	D0bd6,x
+	sta	D0d80,x
 	ldx	#$00
 	ldy	#$ff
-
-	if	iver==iver2a
-	lda	#$2a
-	else
-	lda	#$29
-	endif
-
-.loop3:	sta	D0b56,x
+	lda	#$29		; FIXME - not sure how this is determined
+.loop3:	sta	D0d00,x
 	inx
 	iny
 	tya
-
-	if	iver==iver2a
-	cpx	#$2b
-	else
 	cpx	#$2a
-	endif
-
 	bcc	.loop3
-	jmp	Led13
+	jmp	Lf09c
 
 
-Sef23:	pha
+Sf2ac:	pha
 	inc	aux_ptr+1
 	bne	.fwd1
 	inc	aux_ptr+2
@@ -5233,9 +5335,9 @@ Sef23:	pha
 advance_pc_page:
 	pha
 	inc	pc+1
-	bne	.fwd1
+	bne	Lf2bf
 	inc	pc+2
-.fwd1:	jsr	find_pc_page
+Lf2bf:	jsr	find_pc_page
 	pla
 	rts
 
@@ -5246,13 +5348,13 @@ advance_pc_page:
 ;   Y = fetched byte
 fetch_aux_byte:
 	ldy	aux_phys_page+2
-	sta	rd_main_ram,y	; indexed to get main or card
+	sta	rd_main_ram,y
 	ldy	aux_ptr
 	lda	(aux_phys_page),y
 	sta	rd_main_ram
 	inc	aux_ptr
 	bne	.fwd1
-	jsr	Sef23
+	jsr	Sf2ac
 .fwd1:	tay
 	rts
 
@@ -5266,7 +5368,7 @@ fetch_pc_byte:
 	rts
 
 
-Sef65:	lda	Z6d
+Sf2ee:	lda	Z6d
 	asl
 	sta	aux_ptr
 	lda	Z6e
@@ -5281,29 +5383,29 @@ Sef65:	lda	Z6d
 	jmp	find_aux_page
 
 
-Lef7d:	rts
+Lf306:	rts
 
-Sef7e:	ldx	#$00
-	stx	Za6
-	stx	Zaa
+Sf307:	ldx	#$00
+	stx	Za8
+	stx	Zac
 	dex
-	stx	Za7
-.loop1:	jsr	Sf064
-	bcs	Lef7d
-	sta	Za8
+	stx	Za9
+.loop1:	jsr	Sf3ed
+	bcs	Lf306
+	sta	Zaa
 	tax
 	beq	.fwd4
 	cmp	#$04
 	bcc	.fwd7
 	cmp	#$06
 	bcc	.fwd5
-	jsr	Sf046
+	jsr	Sf3cf
 	tax
 	bne	.fwd1
 	lda	#$5b
 .loop2:	clc
-	adc	Za8
-.loop3:	jsr	Sf311
+	adc	Zaa
+.loop3:	jsr	Sf69a
 	jmp	.loop1
 
 .fwd1:	cmp	#$01
@@ -5311,23 +5413,23 @@ Sef7e:	ldx	#$00
 	lda	#$3b
 	bne	.loop2		; always taken
 
-.fwd2:	lda	Za8
+.fwd2:	lda	Zaa
 	sec
 	sbc	#$06
 	beq	.fwd3
 	tax
-	lda	Df195,x
+	lda	Df51e,x
 	jmp	.loop3
 
-.fwd3:	jsr	Sf064
+.fwd3:	jsr	Sf3ed
 	asl
 	asl
 	asl
 	asl
 	asl
-	sta	Za8
-	jsr	Sf064
-	ora	Za8
+	sta	Zaa
+	jsr	Sf3ed
+	ora	Zaa
 	jmp	.loop3
 
 .fwd4:	lda	#$20
@@ -5336,16 +5438,16 @@ Sef7e:	ldx	#$00
 .fwd5:	sec
 	sbc	#$03
 	tay
-	jsr	Sf046
+	jsr	Sf3cf
 	bne	.fwd6
-	sty	Za7
+	sty	Za9
 	jmp	.loop1
 
-.fwd6:	sty	Za6
-	cmp	Za6
+.fwd6:	sty	Za8
+	cmp	Za8
 	beq	.loop1
 	lda	#$00
-	sta	Za6
+	sta	Za8
 	beq	.loop1		; always taken
 
 .fwd7:	sec
@@ -5356,11 +5458,11 @@ Sef7e:	ldx	#$00
 	asl
 	asl
 	asl
-	sta	Za9
-	jsr	Sf064
+	sta	Zab
+	jsr	Sf3ed
 	asl
 	clc
-	adc	Za9
+	adc	Zab
 	tay
 	lda	(Z87),y
 	sta	Z6e
@@ -5373,24 +5475,24 @@ Sef7e:	ldx	#$00
 	pha
 	lda	aux_ptr
 	pha
-	lda	Za6
-	pha
-	lda	Zaa
+	lda	Za8
 	pha
 	lda	Zac
 	pha
-	lda	Zab
+	lda	Zae
 	pha
-	jsr	Sf052
-	jsr	Sef7e
+	lda	Zad
+	pha
+	jsr	Sf3db
+	jsr	Sf307
 	pla
-	sta	Zab
+	sta	Zad
+	pla
+	sta	Zae
 	pla
 	sta	Zac
 	pla
-	sta	Zaa
-	pla
-	sta	Za6
+	sta	Za8
 	pla
 	sta	aux_ptr
 	pla
@@ -5398,22 +5500,22 @@ Sef7e:	ldx	#$00
 	pla
 	sta	aux_ptr+2
 	ldx	#$ff
-	stx	Za7
+	stx	Za9
 	jsr	find_aux_page
 	jmp	.loop1
 
 
-Sf046:	lda	Za7
+Sf3cf:	lda	Za9
 	bpl	.fwd1
-	lda	Za6
+	lda	Za8
 	rts
 
 .fwd1:	ldy	#$ff
-	sty	Za7
+	sty	Za9
 	rts
 
 
-Sf052:	lda	Z6d
+Sf3db:	lda	Z6d
 	asl
 	sta	aux_ptr
 	lda	Z6e
@@ -5425,18 +5527,18 @@ Sf052:	lda	Z6d
 	jmp	find_aux_page
 
 
-Sf064:	lda	Zaa
+Sf3ed:	lda	Zac
 	bpl	.fwd1
 	sec
 	rts
 
 .fwd1:	bne	.fwd2
-	inc	Zaa
+	inc	Zac
 	jsr	fetch_aux_byte
-	sta	Zac
+	sta	Zae
 	jsr	fetch_aux_byte
-	sta	Zab
-	lda	Zac
+	sta	Zad
+	lda	Zae
 	lsr
 	lsr
 	jmp	.fwd5
@@ -5445,10 +5547,10 @@ Sf064:	lda	Zaa
 	sbc	#$01
 	bne	.fwd3
 	lda	#$02
-	sta	Zaa
-	lda	Zab
+	sta	Zac
+	lda	Zad
 	sta	Z6d
-	lda	Zac
+	lda	Zae
 	asl	Z6d
 	rol
 	asl	Z6d
@@ -5458,93 +5560,93 @@ Sf064:	lda	Zaa
 	jmp	.fwd5
 
 .fwd3:	lda	#$00
-	sta	Zaa
-	lda	Zac
+	sta	Zac
+	lda	Zae
 	bpl	.fwd4
 	lda	#$ff
-	sta	Zaa
-.fwd4:	lda	Zab
+	sta	Zac
+.fwd4:	lda	Zad
 .fwd5:	and	#$1f
 	clc
 	rts
 
 
-Sf0ac:	lda	#$05
+Sf435:	lda	#$05
 	ldx	#$08
-.loop1:	sta	Z94,x
+.loop1:	sta	Z96,x
 	dex
 	bpl	.loop1
 	lda	#$09
-	sta	Zad
-	lda	#$00
-	sta	Zae
 	sta	Zaf
-.loop2:	ldx	Zae
-	inc	Zae
-	lda	Z8b,x
-	sta	Za8
+	lda	#$00
+	sta	Zb0
+	sta	Zb1
+.loop2:	ldx	Zb0
+	inc	Zb0
+	lda	Z8d,x
+	sta	Zaa
 	bne	.fwd1
 	lda	#$05
-	bne	.loop3		; always taken
+	bne	.loop3		; alway taken
 
-.fwd1:	lda	Za8
+.fwd1:	lda	Zaa
 	jsr	get_letter_case
 	beq	.fwd3
 	clc
 	adc	#$03
-	ldx	Zaf
-	sta	Z94,x
-	inc	Zaf
-	dec	Zad
+	ldx	Zb1
+	sta	Z96,x
+	inc	Zb1
+	dec	Zaf
 	bne	.fwd2
-	jmp	Lf15c
+	jmp	Lf4e5
 
-.fwd2:	lda	Za8
+.fwd2:	lda	Zaa
 	jsr	get_letter_case
 	cmp	#$02
 	beq	.fwd4
-	lda	Za8
+	lda	Zaa
 	sec
 	sbc	#$3b
 	bpl	.loop3
-.fwd3:	lda	Za8
+.fwd3:	lda	Zaa
 	sec
 	sbc	#$5b
-.loop3:	ldx	Zaf
-	sta	Z94,x
-	inc	Zaf
-	dec	Zad
+.loop3:	ldx	Zb1
+	sta	Z96,x
+	inc	Zb1
+	dec	Zaf
 	bne	.loop2
-	jmp	Lf15c
+	jmp	Lf4e5
 
-.fwd4:	lda	Za8
-	jsr	Sf133
+.fwd4:	lda	Zaa
+	jsr	Sf4bc
 	bne	.loop3
 	lda	#$06
-	ldx	Zaf
-	sta	Z94,x
-	inc	Zaf
-	dec	Zad
-	beq	Lf15c
-	lda	Za8
+	ldx	Zb1
+	sta	Z96,x
+	inc	Zb1
+	dec	Zaf
+	beq	Lf4e5
+	lda	Zaa
 	lsr
 	lsr
 	lsr
 	lsr
 	lsr
 	and	#$03
-	ldx	Zaf
-	sta	Z94,x
-	inc	Zaf
-	dec	Zad
-	beq	Lf15c
-	lda	Za8
+	ldx	Zb1
+	sta	Z96,x
+	inc	Zb1
+	dec	Zaf
+	beq	Lf4e5
+	lda	Zaa
 	and	#$1f
 	jmp	.loop3
 
 
-Sf133:	ldx	#$19
-.loop1:	cmp	Df195,x
+Sf4bc:	ldx	#$19
+.loop1:	cmp	Df51e,x
 	beq	.fwd1
 	dex
 	bne	.loop1
@@ -5581,46 +5683,46 @@ get_letter_case:
 	rts
 
 
-Lf15c:	lda	Z95
+Lf4e5:	lda	Z97
 	asl
 	asl
 	asl
 	asl
-	rol	Z94
+	rol	Z96
 	asl
-	rol	Z94
-	ora	Z96
-	sta	Z95
-	lda	Z98
-	asl
-	asl
-	asl
-	asl
-	rol	Z97
-	asl
-	rol	Z97
-	ora	Z99
-	tax
-	lda	Z97
-	sta	Z96
-	stx	Z97
-	lda	Z9b
-	asl
-	asl
-	asl
-	asl
-	rol	Z9a
-	asl
-	rol	Z9a
-	ora	Z9c
-	sta	Z99
+	rol	Z96
+	ora	Z98
+	sta	Z97
 	lda	Z9a
-	ora	#$80
+	asl
+	asl
+	asl
+	asl
+	rol	Z99
+	asl
+	rol	Z99
+	ora	Z9b
+	tax
+	lda	Z99
 	sta	Z98
+	stx	Z99
+	lda	Z9d
+	asl
+	asl
+	asl
+	asl
+	rol	Z9c
+	asl
+	rol	Z9c
+	ora	Z9e
+	sta	Z9b
+	lda	Z9c
+	ora	#$80
+	sta	Z9a
 	rts
 
 
-Df195:	fcb	$00,char_cr
+Df51e:	fcb	$00,char_cr
 	fcb	"0123456789"
 	fcb	".,!?_#'"
 	fcb	$22		; double quote
@@ -5662,7 +5764,7 @@ setup_object:
 	rts
 
 
-Sf1e3:	lda	arg1
+Sf56c:	lda	arg1
 	ldx	arg1+1
 	jsr	setup_object
 	ldy	#$0c
@@ -5681,13 +5783,12 @@ Sf1e3:	lda	arg1
 	iny
 	rts
 
-
-Sf201:	lda	(Z6d),y
+Sf58a:	lda	(Z6d),y
 	and	#$3f
 	rts
 
 
-Sf206:	lda	(Z6d),y
+Sf58f:	lda	(Z6d),y
 	and	#$80
 	beq	.fwd1
 	iny
@@ -5705,7 +5806,7 @@ Sf206:	lda	(Z6d),y
 	rts
 
 
-Sf21e:	jsr	Sf206
+Sf5a7:	jsr	Sf58f
 	tax
 .loop1:	iny
 	bne	.fwd1
@@ -5718,7 +5819,7 @@ Sf21e:	jsr	Sf206
 	rts
 
 
-Sf230:	jsr	Sf21e
+Sf5b9:	jsr	Sf5a7
 	tya
 	clc
 	adc	Z6d
@@ -5782,7 +5883,7 @@ setup_attribute:
 
 msg_internal_error:
 	text_str	"Internal error "
-Df2a4:	text_str	"00.  "
+Df62d:	text_str	"00.  "
 msg_len_internal_error	equ	*-msg_internal_error
 
 
@@ -5790,7 +5891,7 @@ msg_len_internal_error	equ	*-msg_internal_error
 ;   A = error number
 ; Does not return
 int_error:
-	ldy	#$01		; divide by 10, storing into message
+	ldy	#$01
 .loop1:	ldx	#0
 .loop2:	cmp	#10
 	bcc	.fwd1
@@ -5798,18 +5899,18 @@ int_error:
 	inx
 	bne	.loop2
 .fwd1:	ora	#$30
-	sta	Df2a4,y
+	sta	Df62d,y
 	txa
 	dey
 	bpl	.loop1
 	prt_msg	internal_error
-	jmp	Lf2ce
+	jmp	Lf657
 
 
 ; Does not return
 op_quit:
-	jsr	op_new_line
-Lf2ce:	prt_msg	end_of_session
+	jsr	new_line
+Lf657:	prt_msg	end_of_session
 	jmp	*		; deliberately hang
 
 
@@ -5825,37 +5926,32 @@ op_restart:
 	lda	ostream_2_state
 	beq	.fwd1
 	dex
-	stx	Ddc34
-.fwd1:	jsr	Sd856
+	stx	Ddba9
+.fwd1:	jsr	Sd871
 	jmp	restart
 
 
-; Unreferenced? See S14dc in ZIP revision F
+; Unreferenced. See S14dc in ZIP version F
 	lda	#$fb
 	rts
 
 
-Sf2ff:	inc	rndloc
+Sf688:	inc	rndloc
 	dec	rndloc+1
 	lda	rndloc
-	adc	Zc0
+	adc	Zc5
 	tax
 	lda	rndloc+1
-	sbc	Zc0+1
-	sta	Zc0
-	stx	Zc0+1
+	sbc	Zc5+1
+	sta	Zc5
+	stx	Zc5+1
 	rts
 
 
-Sf311:	sta	Zd7
+Sf69a:	sta	Zdc
 	ldx	ostream_3_state
 	beq	.fwd1
-
-	if	iver==iver2a
-	jsr	Sf3b3
-	else
-	jmp	Sf3b3
-	endif
+	jmp	Lf728
 
 .fwd1:	ldx	ostream_1_state
 	bne	.fwd2
@@ -5863,119 +5959,109 @@ Sf311:	sta	Zd7
 	bne	.fwd2
 	rts
 
-.fwd2:	lda	Zd7
-	ldx	Zbd
-	bne	.fwd6
+.fwd2:	lda	Zdc
+	ldx	Zc2
+	bne	Sf6d6
 	cmp	#char_cr
 	bne	.fwd3
-	jmp	op_new_line
+	jmp	new_line
 
 .fwd3:	cmp	#' '
 	bcc	.rtn
 	ldx	invflg
 	bpl	.fwd4
 	ora	#$80
-.fwd4:	ldx	Zd1
+.fwd4:	ldx	Zd6
 	sta	D0200,x
-	ldy	Zd0
-	cpy	Zbf
+	ldy	Zd5
+	cpy	Zc4
 	bcc	.fwd5
-	jmp	Lf3cd
+	jmp	Lf742
 
-.fwd5:	inc	Zd0
-	inc	Zd1
+.fwd5:	inc	Zd5
+	inc	Zd6
 .rtn:	rts
 
-.fwd6:	sta	Zd7
-	cmp	#$20
-	bcc	.rtn2
+
+Sf6d6:	sta	Zdc
 	lda	D057b
 	cmp	#$50
-	bcs	.rtn2
-	lda	cursrh
-	cmp	#$50
-	bcs	.rtn2
-	lda	Zc2
-	beq	.fwd7
+	bcs	.rtn
+	lda	Zc7
+	beq	.fwd1
 	lda	cursrv
 	cmp	wndtop
-	bcs	.rtn2
-	bcc	.fwd8		; always taken
+	bcs	.rtn
+	bcc	.fwd2		; always taken
 
-.fwd7:	lda	cursrv
+.fwd1:	lda	cursrv
 	cmp	wndtop
-	bcc	.rtn2
-.fwd8:	lda	ostream_1_state
-	beq	.fwd9
-	lda	Zd7
+	bcc	.rtn
+.fwd2:	lda	ostream_1_state
+	beq	.fwd3
+	lda	Zdc
 	ora	#$80
-	jsr	cout
-.fwd9:	lda	Zc2
-	bne	.rtn2
-	lda	Zd4
-	beq	.rtn2
+	jsr	Sdb39
+.fwd3:	lda	Zd9
+	beq	.rtn
 	lda	ostream_2_state
-	beq	.rtn2
+	beq	.rtn
 	lda	cswl
 	pha
 	lda	cswl+1
 	pha
 	lda	D057b
 	pha
-	lda	cursrh
-	pha
-	lda	Ddc35
+	lda	Ddbaa
 	sta	cswl
-	lda	Ddc35+1
+	lda	Ddbaa+1
 	sta	cswl+1
-	lda	Zd7
-	jsr	cout
-	pla
-	sta	cursrh
+	lda	Zdc
+	jsr	S08ef
 	pla
 	sta	D057b
 	pla
 	sta	cswl+1
 	pla
 	sta	cswl
-.rtn2:	rts
+.rtn:	rts
 
 
-Sf3b3:	tax
-	lda	Zb9
+Lf728:	tax
+	lda	Zbe
 	clc
-	adc	Zb7
+	adc	Zbc
 	sta	Z6d
-	lda	Zba
-	adc	Zb8
+	lda	Zbf
+	adc	Zbd
 	sta	Z6e
 	ldy	#$00
 	txa
 	sta	(Z6d),y
-	inc	Zb9
+	inc	Zbe
 	bne	.rtn
-	inc	Zba
+	inc	Zbf
 .rtn:	rts
 
 
-Lf3cd:	lda	#$a0
-	stx	Zd3
+Lf742:	lda	#$a0
+	stx	Zd8
 .loop1:	cmp	D0200,x
 	beq	.fwd1
 	dex
 	bne	.loop1
-	ldx	Zbf
-.fwd1:	stx	Zd2
-	stx	Zd1
-	jsr	op_new_line
-	ldx	Zd2
+	ldx	Zc4
+.fwd1:	stx	Zd7
+	stx	Zd6
+	jsr	new_line
+	ldx	Zd7
 	ldy	#$00
 .loop2:	inx
-	cpx	Zd3
+	cpx	Zd8
 	bcc	.fwd2
 	beq	.fwd2
-	sty	Zd0
-	sty	Zd1
+	sty	Zd5
+	sty	Zd6
 	rts
 
 .fwd2:	lda	D0200,x
@@ -5985,59 +6071,165 @@ Lf3cd:	lda	#$a0
 
 
 op_new_line:
-	ldx	Zd1
+	ldx	ostream_3_state
+	beq	new_line
+	lda	#char_cr
+	jmp	Lf728
+
+
+new_line:
+	ldx	Zd6
 	lda	#$8d
 	sta	D0200,x
-	inc	Zd1
+	inc	Zd6
 	lda	ostream_1_state
 	beq	.fwd2
-	lda	Zc2
-	bne	.fwd1
-	inc	Zd5
-.fwd1:	ldx	Zd5
-	inx
+	lda	Zc7
+	bne	.fwd2
+	inc	Zda
+	ldx	Zda
 	cpx	wndbot
-	bcc	.fwd2
+	bne	.fwd2
 	lda	wndtop
-	sta	Zd5
-	inc	Zd5
+	sta	Zda
 	bit	kbd_strb
+	lda	hdr_unknown_29
+	sta	D057b
 	prt_msg_alt	more
 .loop1:	bit	kbd
 	bpl	.loop1
 	bit	kbd_strb
 	ldy	#$06
 .loop2:	lda	#$08
-	jsr	cout
+	jsr	S08ef
 	dey
 	bne	.loop2
-	jsr	clreol
-.fwd2:	jsr	Sf446
+	jsr	S08c5
+.fwd2:	jsr	Sf7ca
+	jsr	Sf7e4
 	lda	#$00
-	sta	Zd0
-	sta	Zd1
+	sta	Zd5
+	sta	Zd6
 	rts
 
 
-Sf446:	ldy	Zd1
+Sf7ca:	ldy	Zd6
 	beq	.rtn
-	sty	Zde
+	sty	Ze3
 	lda	ostream_1_state
 	beq	.fwd1
 	ldx	#$00
 .loop1:	lda	D0200,x
-	jsr	Sdaee
+	jsr	Sdb39
 	inx
 	dey
 	bne	.loop1
-.fwd1:	lda	Zc2
-	bne	.rtn
-	jsr	Sdbf3
+.fwd1:	jsr	Sdb70
 .rtn:	rts
+
+
+Sf7e4:	lda	hdr_os3_pixels_sent+1
+	ora	hdr_os3_pixels_sent
+	beq	Lf812
+	lda	hdr_os3_pixels_sent+1
+	sec
+	sbc	#$01
+	sta	hdr_os3_pixels_sent+1
+	lda	hdr_os3_pixels_sent
+	sbc	#$00
+	sta	hdr_os3_pixels_sent
+	lda	hdr_os3_pixels_sent+1
+	ora	hdr_os3_pixels_sent
+	bne	Lf812
+	lda	hdr_std_rev_num+1
+	sta	Z6f
+	lda	hdr_std_rev_num
+	sta	Z70
+	jsr	Sfcea
+Lf812:	rts
 
 
 op_show_status:
 	rts
+
+
+op_verify:
+	jsr	new_line
+	ldx	#$03
+	lda	#$00
+	sta	Zdc
+.loop1:	sta	Z71,x
+	sta	aux_ptr,x
+	dex
+	bpl	.loop1
+	lda	#$40
+	sta	aux_ptr
+	lda	hdr_length
+	sta	Z6e
+	lda	hdr_length+1
+	asl
+	rol	Z6e
+	rol	Z71
+	asl
+	sta	Z6d
+	rol	Z6e
+	rol	Z71
+	lda	#$00
+	sta	disk_block_num
+	sta	disk_block_num+1
+
+	jmp	.fwd1
+.loop2:	lda	aux_ptr
+	bne	.fwd2
+.fwd1:	lda	#$0a
+	sta	Zb8
+	lda	#$00
+	sta	Df090
+	jsr	Sd51d
+	lda	Zdc
+	bne	.fwd2
+	lda	Zec
+	cmp	#$02
+	bne	.fwd2
+	prt_msg_alt	be_patient
+	inc	Zdc
+.fwd2:	ldy	aux_ptr
+	lda	rwts_data_buf,y
+	inc	aux_ptr
+	bne	.fwd3
+	inc	aux_ptr+1
+	bne	.fwd3
+	inc	aux_ptr+2
+.fwd3:	clc
+	adc	Z73
+	sta	Z73
+	bcc	.fwd4
+	inc	Z74
+.fwd4:	lda	aux_ptr
+	cmp	Z6d
+	bne	.loop2
+	lda	aux_ptr+1
+	cmp	Z6e
+	bne	.loop2
+	lda	aux_ptr+2
+	cmp	Z71
+	bne	.loop2
+	lda	hdr_checksum+1
+	cmp	Z73
+	bne	.rtn_f
+	lda	hdr_checksum
+	cmp	Z74
+	bne	.rtn_f
+	jmp	predicate_true
+
+.rtn_f:	jmp	predicate_false
+
+
+msg_be_patient:
+	fcb	char_cr
+	text_str	"Please be patient, this takes a while"
+	fcb	char_cr
+msg_len_be_patient	equ	*-msg_be_patient
 
 
 ; Note that buffer mode only applies to the lower window,
@@ -6047,17 +6239,21 @@ op_show_status:
 op_buffer_mode:
 	ldx	arg1
 	bne	.fwd1
-	jsr	Sf446
-	ldx	#$00
-	stx	Zd1
-	inx
-	stx	Zbd
+	jsr	Sf8e1
+	ldx	#$01
+	stx	Zc2
 	rts
 
 .fwd1:	dex
 	bne	.rtn
-	stx	Zbd
+	stx	Zc2
 .rtn:	rts
+
+
+Sf8e1:	jsr	Sf7ca
+	ldx	#$00
+	stx	Zd6
+	rts
 
 
 op_output_stream:
@@ -6079,7 +6275,7 @@ ostream_deselect:
 	inx
 	beq	ostream_deselect_2
 	inx
-	beq	ostream_deselect_3
+	beq	osteram_deselect_3
 	inx
 	beq	ostream_deselect_4
 	rts
@@ -6092,6 +6288,7 @@ ostream_select_1:
 	rts
 
 ostream_deselect_1:
+	jsr	Sf8e1
 	stx	ostream_1_state
 	rts
 
@@ -6103,9 +6300,9 @@ ostream_select_2:
 	lda	hdr_flags2+1
 	ora	#$01
 	sta	hdr_flags2+1
-	lda	Ddc34
+	lda	Ddba9
 	bne	.rtn
-	jsr	Sdc37
+	jsr	Sdbac
 .rtn:	rts
 
 ostream_deselect_2:
@@ -6125,46 +6322,42 @@ ostream_select_3:
 	clc
 	adc	Z81
 	ldx	arg2
-	stx	Zb7
-	sta	Zb8
+	stx	Zbc
+	sta	Zbd
 	lda	#$02
-	sta	Zb9
+	sta	Zbe
 	lda	#$00
-	sta	Zba
+	sta	Zbf
 	rts
 
-ostream_deselect_3:
-	if	iver>=iver2c
-	lda	ostream_3_state		; if no output stream 3 was selected, do nothing.
+osteram_deselect_3:
+	lda	ostream_3_state
 	beq	.fwd2
-; This above fix appears to introduce a new bug, in that the following
-; "stx ostream_3_state" instruction (outside the conditional assembly)
-; will always store 1, even if the ostream table stack is empty.
-	endif
 	stx	ostream_3_state
-	lda	Zb9
+	lda	Zbe
 	clc
-	adc	Zb7
+	adc	Zbc
 	sta	Z6d
-	lda	Zba
-	adc	Zb8
+	lda	Zbf
+	adc	Zbd
 	sta	Z6e
 	lda	#$00
 	tay
 	sta	(Z6d),y
 	ldy	#$01
-	lda	Zb9
+	lda	Zbe
 	sec
 	sbc	#$02
-	sta	(Zb7),y
+	sta	(Zbc),y
 	bcs	.fwd1
-	dec	Zba
-.fwd1:	lda	Zba
+	dec	Zbf
+.fwd1:	lda	Zbf
 	dey
-	sta	(Zb7),y
+	sta	(Zbc),y
 	lda	#$00
-	sta	Zb6
-.fwd2	rts
+	sta	Zbb
+.fwd2:	rts
+
 
 ; output stream 4, if it existed, would be a script file of user input
 ostream_select_4:
@@ -6173,67 +6366,47 @@ ostream_deselect_4:
 
 
 op_set_cursor:
-	if	iver==iver2a
-
-	lda	hdr_flags_1
-	and	#$10
-	beq	.rtn
-	lda	Zc2
-	bne	.fwd2
-	ldx	arg1
-	dex
-	txa
-	clc
-	adc	wndtop
-	sta	cursrv
-	ldx	Zbd
-	bne	.fwd1
-	sta	Zd5
-
-.fwd1:	ldx	arg2
-	dex
-	stx	D057b
-	stx	cursrh
-	jmp	vtab
-
-.rtn:	rts
-
-.fwd2:	ldx	arg1
-	dex
-	stx	cursrv
-	jmp	.fwd1
-
-	else
-
-	lda	hdr_flags_1
-	and	#$10
-	beq	.rtn
-	ldy	Zbd
-	beq	.rtn
-	ldy	Zc2
-	beq	.rtn
+	jsr	Sf8e1
 	ldx	arg1
 	dex
 	stx	cursrv
-
 	ldx	arg2
 	dex
 	stx	D057b
-	stx	cursrh
-	jmp	vtab
-
-.rtn:	rts
-
-	endif
-
+	jmp	S08a9
 
 
 op_get_cursor:
+	lda	arg1
+	sta	Z6d
+	lda	arg1+1
+	clc
+	adc	Z81
+	sta	Z6e
+	ldy	cursrv
+	ldx	D057b
+	inx
+	iny
+	tya
+	ldy	#$01
+	sta	(Z6d),y
+	dey
+	tya
+	sta	(Z6d),y
+	iny
+	iny
+	sta	(Z6d),y
+	iny
+	txa
+	sta	(Z6d),y
+	rts
+
+
 op_input_stream:
 	rts
 
 
-op_set_text_state:
+op_set_text_style:
 	lda	arg1
 	bne	.fwd1
 	lda	#$ff
@@ -6242,197 +6415,624 @@ op_set_text_state:
 
 .fwd1:	cmp	#$01
 	bne	.rtn
-	lda	hdr_flags_1
-	and	#$02
-	beq	.rtn
 	lda	#$3f
 	sta	invflg
 	rts
 
 
 op_erase_line:
-	lda	hdr_flags_1
-	and	#$10
-	beq	Lf559
 	lda	arg1
 	cmp	#$01
-	bne	Lf559
-	jmp	clreol
+	bne	Lf9cb
+	jsr	Sf8e1
+	jmp	S08c5
 
-Lf559:	rts
+Lf9cb:	rts
 
 
 op_erase_window:
-	lda	hdr_flags_1
-	and	#$01
-	beq	Lf559
+	jsr	Sf8e1
+	fcb	$8d		; sta absolute
+	fdb	Z6d
+	lda	D057b
+	fcb	$8d		; sta absolute
+	fdb	Z6e
+	lda	cursrv
+	fcb	$8d		; sta absolute
+	fdb	Z73
 	lda	arg1
 	beq	.fwd1
 	cmp	#$01
 	beq	.fwd2
 	cmp	#$ff
-	bne	Lf559
-	jsr	Sdcd8
-	jmp	home
+	bne	Lf9cb
+	jsr	Sdc51
+	jmp	Sdccf
 
 .fwd1:	lda	wndtop
-	sta	Zd5
-	jsr	home
-	lda	#$17
-	sta	cursrv
-	jmp	vtab
+	sta	Zda
+	jsr	Sdccf
+	ldx	#$00
+	jmp	.fwd3
 
 .fwd2:	lda	wndtop
 	pha
 	ldx	#$00
 	stx	wndtop
 	sta	wndbot
-	jsr	home
+	jsr	Sdccf
 	lda	#$18
 	sta	wndbot
 	pla
 	sta	wndtop
+	ldx	#$01
+.fwd3:	lda	#$00
+	sta	Dfdea,x
+	sta	Dfde6,x
+	sta	Dfde8,x
+	cpx	Zc7
+	beq	.rtn
+
+	fcb	$ad		; lda absolute
+	fdb	Z6d
+	fcb	$ad		; lda absolute
+	fdb	Z6e
+	sta	D057b
+	fcb	$ad		; lda absolute
+	fdb	Z73
 	sta	cursrv
-	dec	cursrv
-	jmp	vtab
+	jmp	S08a9
+
+.rtn:	rts
+
+
+op_print_table:
+	jsr	Sf8e1
+	lda	arg1
+	sta	aux_ptr
+	lda	arg1+1
+	sta	aux_ptr+1
+	lda	#$00
+	sta	aux_ptr+2
+	jsr	find_aux_page
+	lda	arg2
+	cmp	#$00
+	beq	.rtn
+	sta	Z70
+	sta	Z6f
+	dec	argcnt
+	lda	argcnt
+	cmp	#$01
+	beq	.fwd1
+	lda	arg3
+.fwd1:	sta	Z71
+	lda	cursrh
+	sta	Z6d
+	lda	D057b
+	sta	Z6e
+	lda	cursrv
+	sta	Z73
+.loop1:	jsr	fetch_aux_byte
+	jsr	Sf6d6
+	dec	Z6f
+	bne	.loop1
+	dec	Z71
+	beq	.rtn
+	lda	Z6d
+	lda	Z6e
+	sta	D057b
+	ldx	Z73
+	inx
+	stx	Z73
+	stx	cursrv
+	jsr	S08a9
+	lda	Z70
+	sta	Z6f
+	jmp	.loop1
+
+.rtn:	rts
+
+
+op_set_font:
+	lda	arg1
+	ldx	Zc7
+	cmp	Dfdf2,x
+	beq	.fwd1
+	jsr	Sf8e1
+	lda	arg1
+	jsr	Sfab4
+	bcs	.fwd2
+.fwd1:	ldx	Zc7
+	lda	Dfdf2,x
+	pha
+	lda	arg1
+	sta	Dfdf2,x
+	pla
+	ldx	#$00
+	jmp	store_result
+
+.fwd2:	jmp	store_result_zero
+
+
+Sfab4:	ldx	romid2_save
+	bne	.fwd3
+	cmp	#$01
+	beq	.fwd1
+	cmp	#$03
+	bne	.fwd3
+	lda	#$3f
+	sta	invflg
+	lda	#$1b
+	jsr	S08ef
+	jmp	.fwd2
+
+.fwd1:	lda	#$18
+	jsr	S08ef
+	lda	#$ff
+	sta	invflg
+.fwd2:	clc
+	rts
+
+.fwd3:	sec
+	rts
+
+
+Sfada:	jsr	Sf8e1
+	lda	#$00
+	sta	Z6e
+	sta	Z6d
+	sta	Z70
+	sta	Z6f
+	sta	Dfdf0
+	ldy	wndtop
+	sty	Zda
+	inc	Zda
+	tay
+	lda	(Zc8),y
+	cmp	#$4f
+	bcc	.fwd1
+	lda	#$4e
+.fwd1:	sta	Zc3
+	iny
+	lda	(Zc8),y
+	tax
+	inx
+	inx
+	stx	Dfde3
+	jsr	Sfbbe
+.loop1:	lda	Z6e
+	beq	.fwd2
+	jsr	Sfc54
+	bcc	.fwd3
+	jmp	.rtn
+
+.fwd2:	jsr	Sfd3f
+.fwd3:	jsr	Sfc68
+	bcs	.fwd4
+	sta	Dfdf0
+	cmp	#$0d
+	beq	.fwd10
+	jmp	.fwd11
+
+.fwd4:	cmp	#$0d
+	beq	.fwd10
+	cmp	#$7f
+	beq	.fwd8
+	ldy	Dfde3
+	cpy	Zc3
+	bcs	.fwd9
+	cmp	#$80
+	bcs	.fwd7
+	sta	Dfde4
+	cmp	#$80
+	bcs	.fwd6
+	ldx	invflg
+	bpl	.fwd5
+	ora	#$80
+.fwd5:	jsr	Sdb39
+.fwd6:	lda	Dfde4
+	cmp	#$41
+	bcc	.fwd7
+	cmp	#$5b
+	bcs	.fwd7
+	adc	#$20
+.fwd7:	sta	(Zc8),y
+	inc	Dfde3
+	jmp	.loop1
+
+.fwd8:	lda	Dfde3
+	cmp	#$02
+	beq	.fwd9
+	dec	Dfde3
+	lda	#$08
+	jsr	Sdb39
+	lda	#$a0
+	jsr	Sdb39
+	lda	#$08
+	jsr	Sdb39
+	jmp	.loop1
+
+.fwd9:	jsr	Sdcfb
+	jmp	.loop1
+
+.fwd10:	sta	Dfdf0
+	lda	#$8d
+	jsr	Sdb39
+	lda	Zd9
+	beq	.fwd11
+	lda	hdr_flags2+1
+	and	#$01
+	beq	.fwd11
+	ldy	Dfde3
+	lda	#$0d
+	sta	(Zc8),y
+	ldx	Dfde3
+	dex
+	stx	Za1
+	dex
+.loop2:	lda	(Zc8),y
+	sta	D0200,x
+	dey
+	dex
+	bpl	.loop2
+	jsr	Sfc8e
+	jsr	Sdb70
+.fwd11:	ldy	Dfde3
+	lda	#$00
+	sta	(Zc8),y
+	dey
+	dey
+	tya
+	ldy	#$01
+	sta	(Zc8),y
+.rtn:	rts
+
+
+Sfbbe:	lda	argcnt
+	cmp	#$02
+	beq	.ret
+	lda	arg3
+	sta	Z6e
+	lda	argcnt
+	cmp	#$04
+	bne	.ret
+	lda	arg4
+	sta	Z6f
+	lda	arg4+1
+	sta	Z70
+.ret:	rts
+
+
+Sfbd7:	bit	kbd_strb
+.loop1:	jsr	Sfc33
+	lda	Z6d
+	bne	.loop2
+	lda	Z6e
+	sta	Z6d
+.loop2:	ldx	#$08
+.loop3:	lda	#$30
+	jsr	S0927
+	dex
+	bne	.loop3
+	bit	kbd
+	bmi	.rtn_cc
+	dec	Z6d
+	beq	.fwd1
+	bne	.loop2
+.fwd1:	jsr	Sfc47
+	lda	Z70
+	beq	.rtn_cs
+	jsr	Sfcea
+	lda	acc
+	bne	.rtn_cs
+	lda	Zda
+	cmp	wndtop
+	beq	.loop1
+	jsr	Sfc18
+	jmp	.loop1
+
+.rtn_cs:
+	sec
+	rts
+
+.rtn_cc:
+	clc
+	rts
+
+
+Sfc18:	ldy	#$01
+.loop1:	iny
+	cpy	Dfde3
+	beq	.fwd1
+	lda	(Zc8),y
+	cmp	#$80
+	bcs	.loop1
+	ora	#$80
+	jsr	Sdb39
+	jmp	.loop1
+
+.fwd1:	lda	wndtop
+	sta	Zda
+	rts
+
+
+Sfc33:	ldx	invflg
+	txa
+	eor	#$c0
+	sta	invflg
+	lda	#$a0
+	jsr	Sdb39
+	lda	#$08
+	jsr	Sdb39
+	stx	invflg
+	rts
+
+
+Sfc47:	pha
+	lda	#$a0
+	jsr	Sdb39
+	lda	#$08
+	jsr	Sdb39
+	pla
+	rts
+
+
+Sfc54:	jsr	Sfbd7
+	bcc	.fwd1		; this instruction is redundant
+	bcs	.rtn_cs		; always taken, could be just a branch to an rts
+
+.fwd1:	jsr	Sfd35
+	beq	Sfc54
+	jsr	Sfc47
+	clc
+	bcc	.rtn		; always taken - this could just be an rts
+
+.rtn_cs:
+	sec
+.rtn:	rts
+
+
+Sfc68:	pha
+	lda	Z8c
+	ora	Z8b
+	beq	.fwd2
+	pla
+	ldx	Zb4
+	beq	.fwd1
+	cmp	#$80
+	bcs	.rtn_cc
+	bcc	.rtn_cs
+.fwd1:	ldy	#$00
+.loop1:	cmp	(Z8b),y
+	beq	.rtn_cc
+	pha
+	lda	(Z8b),y
+	beq	.fwd2
+	pla
+	iny
+	bne	.loop1
+.fwd2:	pla
+.rtn_cs:
+	sec
+	rts
+
+.rtn_cc:
+	clc
+	rts
+
+
+Sfc8e:	ldy	#$00
+	ldx	#$00
+.loop1:	lda	D0200,y
+	cmp	#$80
+	bcs	.fwd2
+	cmp	#$00
+	bne	.fwd1
+	lda	#$8d
+.fwd1:	sta	D0200,x
+	inx
+.fwd2:	iny
+	cpy	Za1
+	bne	.loop1
+	stx	Ze3
+	rts
 
 
 op_read_char:
 	lda	arg1
 	cmp	#$01
-	bne	.fwd3
+	bne	.fwd4
+	jsr	Sf8e1
 	lda	wndtop
-	sta	Zd5
-
-	if	iver<=iver2d
+	sta	Zda
 	lda	#$00
-	sta	Zd0
-	else
-	inc	Zd5
-	lda	#$00
-	endif
-
-	sta	Zd1
+	sta	Zd6
+	sta	Z6e
+	sta	Z6d
+	sta	Z70
+	sta	Z6f
 	dec	argcnt
 	beq	.fwd2
 	lda	arg2
 	sta	Z6e
-	lda	#$00
-	sta	Z70
-	sta	Z6f
 	dec	argcnt
 	beq	.fwd1
 	lda	arg3
 	sta	Z6f
 	lda	arg3+1
 	sta	Z70
-.fwd1:	bit	kbd_strb
-.loop1:	lda	Z6e
-	sta	Z6d
-.loop2:	ldx	#$0a
-.loop3:	lda	#$40
-	jsr	Sfca8
-	dex
-	bne	.loop3
-	bit	kbd
-	bmi	.fwd2
-	dec	Z6d
-	bne	.loop2
-	lda	Z6f
-	ora	Z70
-	beq	.fwd3
-	jsr	Sf5f9
-	lda	acc
-	bne	.fwd3
-	beq	.loop1		; always taken
-
-.fwd2:	jsr	Sda78
-	ldx	#$00
+.fwd1:	jsr	Sfc54
+	bcs	.fwd4
+	bcc	.fwd3
+.fwd2:	jsr	Sfd3f
+.fwd3:	ldx	#$00
 	jmp	store_result_xa
 
-.fwd3:	jmp	store_result_zero
+.fwd4:	jmp	store_result_zero
 
 
-Sf5f9:	lda	#Lf67c>>8
-	sta	Le4db+2
-	lda	#Lf67c&$ff
-	sta	Le4db+1
-	lda	Z6e
+Sfcea:	lda	Z6e
+	pha
+	lda	Z6d
 	pha
 	lda	Z70
+	sta	arg1+1
 	pha
 	lda	Z6f
+	sta	arg1
 	pha
-	ldx	Zed
-	lda	Zed+1
-	jsr	push_ax
+	ldx	#$01
+	stx	argcnt
+	dex
+	stx	call_store_result_flag
 	lda	pc
-	jsr	push_ax
-	ldx	pc+1
+	pha
+	lda	pc+1
+	pha
 	lda	pc+2
-	jsr	push_ax
+	pha
 	lda	#$00
-	asl	Z6f
-	rol	Z70
-	rol
 	sta	pc+2
-	asl	Z6f
-	rol	Z70
-	rol	pc+2
-	lda	Z70
 	sta	pc+1
-	lda	Z6f
 	sta	pc
-	jsr	find_pc_page
-	jsr	fetch_pc_byte
-	sta	Z6f
-	sta	Z70
-	beq	.fwd1
-	lda	#$00
-	sta	Z6d
-.loop1:	ldy	Z6d
-	ldx	local_vars,y
-	lda	local_vars+1,y
-	jsr	push_ax
-	jsr	fetch_pc_byte
-	sta	Z6e
-	jsr	fetch_pc_byte
-	ldy	Z6d
-	sta	local_vars,y
-	lda	Z6e
-	sta	local_vars+1,y
-	iny
-	iny
-	sty	Z6d
-	dec	Z6f
-	bne	.loop1
-.fwd1:	ldx	Z70
-	txa
-	jsr	push_ax
-	lda	stk_ptr
-	sta	Zed
-	lda	stk_ptr+1
-	sta	Zed+1
+	jsr	do_call
 	jmp	main_loop
 
 
-Lf67c:	lda	#store_result>>8
-	sta	Le4db+2
-	lda	#store_result&$ff
-	sta	Le4db+1
+Lfd19:	pla
 	pla
 	pla
+	sta	pc+2
+	pla
+	sta	pc+1
+	pla
+	sta	pc
+	jsr	find_pc_page
 	pla
 	sta	Z6f
 	pla
 	sta	Z70
+	pla
+	sta	Z6d
 	pla
 	sta	Z6e
 	rts
 
 
-msg_more:
-	text_str	"[MORE]"
+Dfd34:	fcb	$00
+
+
+Sfd35:	pha
+	lda	#$01
+	sta	Dfd34
+	pla
+	jmp	Lfd46
+
+Sfd3f:	pha
+	lda	#$00
+	sta	Dfd34
+	pla
+
+Lfd46:	cld
+	txa
+	pha
+	tya
+	pha
+.loop1:	jsr	S090b
+	lda	kbd
+	and	#$7f
+	cmp	#char_cr
+	bne	.fwd1
+	jmp	.fwd7
+
+.fwd1:	cmp	#char_del
+	bne	.fwd2
+	jmp	.fwd7
+
+.fwd2:	ldx	#$0a
+.loop2:	cmp	Dfdcd,x
+	beq	.fwd3
+	dex
+	bpl	.loop2
+	bmi	.fwd4		; always taken
+.fwd3:	lda	Dfdd8,x
+	jmp	.fwd9
+
+.fwd4:	cmp	#$20
+	bcc	.fwd5
+	cmp	#$3c
+	bcc	.fwd7
+	cmp	#$7c
+	beq	.fwd7
+	cmp	#$3f
+	beq	.fwd7
+	cmp	#$7b
+	bcs	.fwd5
+	cmp	#$61
+	bcs	.fwd7
+	cmp	#$41
+	bcc	.fwd5
+	cmp	#$5b
+	bcc	.fwd7
+.fwd5:	jsr	Sdcfb
+	lda	Dfd34
+	bne	.fwd6
+	jmp	.loop1
+
+.fwd6:	lda	#$00
+.fwd7:	cmp	#$30
+	bcc	.fwd9
+	cmp	#$3a
+	bcs	.fwd9
+	ldx	Dc061
+	bmi	.fwd8
+	ldx	Dc062
+	bpl	.fwd9
+.fwd8:	clc
+	adc	#$54
+	cmp	#$84
+	bne	.fwd9
+	clc
+	adc	#$0a
+.fwd9:	sta	Zdc
+	adc	rndloc
+	sta	rndloc
+	eor	rndloc+1
+	sta	rndloc+1
+	pla
+	tay
+	pla
+	tax
+	lda	Zdc
+	rts
+
+
+Dfdcd:	fcb	$0b,$0a,$08,$15,$3c,$5f,$3e,$40	; "....<_>@"
+	fcb	$25,$5e,$26               	; "%^&"
+
+Dfdd8:	fcb	$81,$82,$83,$84,$2c,$2d,$2e,$32	; "....,-.2"
+	fcb	$35,$36,$37               	; "567"
+
+
+Dfde3:	fcb	$00
+Dfde4:	fcb	$00
+call_store_result_flag:	fcb	$00
+Dfde6:	fcb	$00
+Dfde7:	fcb	$00
+Dfde8:	fcb	$00
+Dfde9:	fcb	$00
+Dfdea:	fcb	$00
+Dfdeb:	fcb	$00,$00
+Dfded:	fcb	$00
+Dfdee:	fcb	$00
+Dfdef:	fcb	$00
+Dfdf0:	fcb	$00
+Dfdf1:	fcb	$00
+
+Dfdf2:	fcb	$01,$01
+
+
+msg_more:	text_str	"[MORE]"
 msg_len_more	equ	*-msg_more
 
 
@@ -6441,13 +7041,10 @@ msg_printer_slot:
 	text_str	"Printer Slot 1-7: "
 msg_len_printer_slot	equ	 *-msg_printer_slot
 
+
 msg_story_loading:
 	text_str	"The story is loading ..."
 msg_len_story_loading	equ	*-msg_story_loading
 
 
-	if	iver==iver2a
-	align	$0100,$ff
-	else
 	align	$0100,$00
-	endif

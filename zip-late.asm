@@ -360,8 +360,8 @@ pre_nibble:
 	rts
 
 
-; write data field
-S093a:	stx	Z6e
+write_data_field:
+	stx	Z6e
 	stx	D0d51
 	sec
 
@@ -893,7 +893,7 @@ L0ce5:	sta	Z66
 	lda	mtr_off,x
 	rts
 
-L0ceb:	jsr	S093a
+L0ceb:	jsr	write_data_field
 	bcc	L0cdf
 	lda	#$10
 	bne	L0ce4		; always taken
