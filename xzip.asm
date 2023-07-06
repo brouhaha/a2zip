@@ -1601,7 +1601,7 @@ Sd871:	lda	#'1'
 
 Sd899:
 	if	iver>=iver_e
-	lda	$f0d4
+	lda	Df0d4
 	beq	.fwd1
 	jmp	Sd871
 	endif
@@ -1949,8 +1949,12 @@ msg_out:
 	ldx	#$00
 .loop1:
 .lda:	fcb	$bd,$00,$00	; lda $0000,x	; self-modifying code, MUST be absolute,x
+
+	if	iver<=iver_f
 	ldy	invflg
 	bpl	.fwd1
+	endif
+
 	ora	#$80
 .fwd1:	jsr	Sdb39
 	inx
@@ -2092,7 +2096,11 @@ op_set_window:
 	ldx	Zc7
 	lda	cursrv
 	sta	Dfdea,x
+
+	if	iver<=iver_f
 	sta	Dfde6,x
+	endif
+
 	lda	D057b
 	sta	Dfde8,x
 	lda	arg1
@@ -2120,7 +2128,11 @@ op_set_window:
 	ldx	Zc7
 	lda	Dfdea,x
 	sta	cursrv
+
+	if	iver<=iver_f
 	lda	Dfde6,x
+	endif
+
 	lda	Dfde8,x
 	sta	D057b
 	jmp	S08a9
@@ -6070,8 +6082,12 @@ Sf69a:	sta	Zdc
 
 .fwd3:	cmp	#' '
 	bcc	.rtn
+
+	if	iver<=iver_f
 	ldx	invflg
 	bpl	.fwd4
+	endif
+
 	ora	#$80
 .fwd4:	ldx	Zd6
 	sta	D0200,x
@@ -6644,8 +6660,12 @@ op_print_table:
 	beq	.fwd1
 	lda	arg3
 .fwd1:	sta	Z71
+
+	if	iver<=iver_f
 	lda	cursrh
 	sta	Z6d
+	endif
+
 	lda	D057b
 	sta	Z6d+1
 	lda	cursrv
@@ -6784,8 +6804,12 @@ Sfada:	jsr	Sf8e1
 	sta	Dfde4
 	cmp	#$80
 	bcs	.fwd6
+
+	if	iver<=iver_f
 	ldx	invflg
 	bpl	.fwd5
+	endif
+
 	ora	#$80
 .fwd5:	jsr	Sdb39
 .fwd6:	lda	Dfde4
@@ -6827,7 +6851,13 @@ Sfada:	jsr	Sf8e1
 	and	#$01
 	beq	.fwd11
 	ldy	Dfde3
+
+	if	iver<=iver_f
 	lda	#$0d
+	else
+	lda	#$00
+	endif
+
 	sta	(Zc8),y
 	ldx	Dfde3
 	dex

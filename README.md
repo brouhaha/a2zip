@@ -13,7 +13,7 @@ interpreted on a ZIP interpreter. ZIP interpreters were written for
 many computers, including the Apple II. In 1983 to 1984 I reverse-engineered
 a substantial portion of the Apple II version 1 through 3 ZIP interpreters.
 
-More recently I've partially reverse-engineered a few newer Apple II
+More recently I've partially reverse-engineered soem newer Apple II
 ZIP, EZIP, and XZIP interpreters.
 
 The reverse-engineered "source code" cross-assembles using the
@@ -109,9 +109,8 @@ There were five revisions of the Apple II XZIP interpreter, A, C, E,
 F, and H. The platform number will be reported as 2, except when using
 an Apple IIc, which will be reported as 9.
 
-Early work on reverse-engineering XZIP interpreter revisions A, C, E, and F
-are present in the source file "xzip.asm". This does not use an
-include file for macro definitions.
+Early work on reverse-engineering thes is present int eh source file
+"xzip.asm". This does not use an include file for macro definitions.
 
 ## YZIP
 
