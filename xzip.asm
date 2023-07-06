@@ -15,7 +15,7 @@ iver_a	equ	$0501	; Released with:
 iver_c	equ	$0503	; Released with:
 			;    Border Zone r9 871008
 
-iver_e	equ	$0503	; Released with:
+iver_e	equ	$0505	; Released with:
 			;    Hitchhiker's Guide to the Galaxy
 			;        (Solid Gold) r31 871119
 			;    Zork I (Solid Gold) r52 871125
@@ -181,14 +181,10 @@ Z6a:		rmb	1
 
 acc:		rmb	2
 
-Z6d:		rmb	1
-Z6e:		rmb	1
-Z6f:		rmb	1
-Z70:		rmb	1
-Z71:		rmb	1
-Z72:		rmb	1
-Z73:		rmb	1
-Z74:		rmb	1
+Z6d:		rmb	2
+Z6f:		rmb	2
+Z71:		rmb	2
+Z73:		rmb	2
 
 pc:		rmb	3
 pc_phys_page:	rmb	3	; physical address of page holding current PC
@@ -198,9 +194,16 @@ aux_ptr:	rmb	3
 aux_phys_page:	rmb	3	; physical address of page holding current aux ptr
 				; third byte is 0/1 for page in main/aux RAM
 
-Z81:		rmb	1
-Z82:		rmb	1
+first_ram_page:	rmb	1
+
+Z82:		if	iver<=iver_c
+		rmb	1
+		else
+		rmb	2
+		endif
+
 Z83:		rmb	1
+
 Z84:		rmb	1
 		rmb	2
 Z87:		rmb	1
@@ -216,6 +219,7 @@ Z97:		rmb	1
 Z98:		rmb	1
 Z99:		rmb	1
 Z9a:		rmb	1
+
 Z9b:		rmb	1
 Z9c:		rmb	1
 Z9d:		rmb	1
@@ -265,8 +269,11 @@ Zca:		rmb	1
 Zcb:		rmb	1
 Zcc:		rmb	2
 Zce:		rmb	2
-Zd0:		rmb	1
-Zd1:		rmb	1
+
+		if	iver<=iver_c
+Zd0:		rmb	2
+		endif
+
 Zd2:		rmb	1
 Zd3:		rmb	1
 Zd4:		rmb	1
@@ -1135,11 +1142,23 @@ Sd51d:	lda	#$00
 	ldx	disk_block_num+1
 	ldy	disk_block_num
 
+	if	iver<=iver_c
+
 	cpx	#$01		; is the block number greater than $100
 	bcc	.fwd5		;   under $100, 16-sector
 	bne	.fwd1		;   $200 or over, 18-sector
 	cpy	#$8a		; is the block number greater than $18a
 	bcc	.fwd5		;   under $18as, 16-sector
+
+	else
+
+	cpx	Z82+1		; is the block number greater than?
+	bcc	.fwd5		;   under $100, 16-sector
+	bne	.fwd1		;   $200 or over, 18-sector
+	cpy	Z82		; is the block number greater than?
+	bcc	.fwd5		;   under $18as, 16-sector
+
+	endif
 
 ; 18-sector
 .fwd1:	lda	Zec
@@ -1150,6 +1169,9 @@ Sd51d:	lda	#$00
 	ldx	disk_block_num+1	; subtract $18a to get side B relative block number
 	ldy	disk_block_num
 .fwd2:	tya
+
+	if	iver<=iver_c
+
 	sec
 	sbc	#$8a
 	tay
@@ -1157,6 +1179,19 @@ Sd51d:	lda	#$00
 	sbc	#$01
 	tax
 	tya
+
+	else
+
+	sec
+	sbc	Z82
+	tay
+	txa
+	sbc	Z82+1
+	tax
+	tya
+
+	endif
+
 
 ; restoring division by 18 sectors/track for side B
 	sec
@@ -1564,7 +1599,14 @@ Sd871:	lda	#'1'
 	bcc	Ld8c7		; always taken
 
 
-Sd899:	lda	#$32
+Sd899:
+	if	iver>=iver_e
+	lda	$f0d4
+	beq	.fwd1
+	jmp	Sd871
+	endif
+
+.fwd1	lda	#'2'
 	sta	Dd84e
 	lda	#$02
 	sta	Zec
@@ -1658,7 +1700,7 @@ op_save:
 	bne	.fwd3
 	lda	arg1+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zb8
 	ldx	arg2+1
 	inx
@@ -1673,7 +1715,7 @@ op_save:
 	bcs	.loop3
 	dec	Z73
 	bne	.loop4
-	lda	Z81
+	lda	first_ram_page
 	sta	Zb8
 	ldx	hdr_pure
 	inx
@@ -1754,7 +1796,7 @@ op_restore:
 .fwd4:	lda	hdr_flags2
 	sta	Z6d
 	lda	hdr_flags2+1
-	sta	Z6e
+	sta	Z6d+1
 
 	lda	#$0f
 	sta	Zb8
@@ -1766,7 +1808,7 @@ op_restore:
 
 .fwd5:	dec	Z73
 	bne	.loop3
-	lda	Z81
+	lda	first_ram_page
 	sta	Zb8
 	jsr	read_sector
 	bcc	.fwd6
@@ -1774,7 +1816,7 @@ op_restore:
 
 .fwd6:	lda	Z6d
 	sta	hdr_flags2
-	lda	Z6e
+	lda	Z6d+1
 	sta	hdr_flags2+1
 	lda	hdr_pure
 	sta	Z6d
@@ -1831,8 +1873,8 @@ op_restore:
 	bpl	.loop6
 	lda	arg1+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	lda	#$00
 	sta	Z6d
 	lda	arg2
@@ -1841,7 +1883,7 @@ op_restore:
 	sta	Z6f
 	lda	arg2+1
 	adc	#$00
-	sta	Z70
+	sta	Z6f+1
 	jsr	Sf0fb
 	lda	#$0a
 	sta	Zb8
@@ -2256,11 +2298,17 @@ restart:
 	inc	Zec
 
 	lda	#hdr_arch>>8
-	sta	Z81
+	sta	first_ram_page
 	sta	Zb8
 
 	lda	#$00
 	sta	Df090
+
+	if	iver>=iver_e
+	lda	#$01
+	sta	Z82+1
+	endif
+
 	jsr	Sd51d
 
 	lda	hdr_arch	; check header architecture version
@@ -2289,9 +2337,25 @@ Ldde9:	lda	hdr_pure
 	adc	#$30
 	sta	msg_position_max_ascii
 
+	if	iver<=iver_c
+
 	ldx	hdr_high_mem	; base of high memory
 	inx
 	stx	Z82
+
+	else
+
+	lda	hdr_high_mem	; base of high memory
+	sta	Z82+1
+	lda	hdr_high_mem+1
+	sta	Z82
+
+	rept	6
+	lsr	Z82+1
+	ror	Z82
+	endm
+
+	endif
 
 	lda	hdr_flags_1
 	ora	#$30		; bit 4: fixed-space style available
@@ -2330,21 +2394,21 @@ Ldde9:	lda	hdr_pure
 
 	lda	hdr_globals
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Z84
 	lda	hdr_globals+1
 	sta	Z83
 
 	lda	hdr_abbrev
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Z88
 	lda	hdr_abbrev+1
 	sta	Z87
 
 	lda	hdr_object
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Z8a
 	lda	hdr_object+1
 	sta	Z89
@@ -2354,7 +2418,7 @@ Ldde9:	lda	hdr_pure
 	beq	Lde7f
 	lda	hdr_term_char_tbl
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Z8c
 	lda	hdr_term_char_tbl+1
 	sta	Z8b
@@ -2489,7 +2553,9 @@ op_extended:
 	jmp	main_loop
 
 
-	fcb	$a9,$01,$4c,$32,$f6
+; unreferenced
+	lda	#$01
+	jmp	int_error
 
 
 int_err_10:
@@ -2696,7 +2762,8 @@ Le0f4:	cmp	#$10
 	lda	local_vars-1,x
 	sta	acc+1
 	rts
-Le105:	jsr	Se1b1
+
+Le105:	jsr	find_global_var
 	lda	(Z6d),y
 	sta	acc+1
 	iny
@@ -2807,7 +2874,7 @@ Le193:	cmp	#$10
 	rts
 
 ; store result in acc into global variable specified by A (offset by $10)
-.fwd2:	jsr	Se1b1
+.fwd2:	jsr	find_global_var
 	lda	acc+1
 	sta	(Z6d),y
 	iny
@@ -2816,18 +2883,23 @@ Le193:	cmp	#$10
 	rts
 
 
-Se1b1:	sec
+; On entry:
+;   A = global var number +$10
+; On exit:
+;   Z6d points to global variable
+find_global_var:
+	sec
 	sbc	#$10
 	ldy	#$00
-	sty	Z6e
+	sty	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	clc
 	adc	Z83
 	sta	Z6d
-	lda	Z6e
+	lda	Z6d+1
 	adc	Z84
-	sta	Z6e
+	sta	Z6d+1
 Le1c6:	rts
 
 
@@ -2881,26 +2953,26 @@ Le20d:	lda	acc
 	sbc	#$00
 	sta	Z6d
 	ldy	#$00
-	sty	Z6e
+	sty	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	txa
 	adc	pc
 	bcc	.fwd5
 	inc	Z6d
 	bne	.fwd5
-	inc	Z6e
+	inc	Z6d+1
 .fwd5:	sta	pc
 	lda	Z6d
-	ora	Z6e
+	ora	Z6d+1
 	beq	op_nop
 	lda	Z6d
 	clc
 	adc	pc+1
 	sta	pc+1
-	lda	Z6e
+	lda	Z6d+1
 	adc	pc+2
 	and	#$03
 	sta	pc+2
@@ -3150,14 +3222,14 @@ op_get_parent:
 op_get_prop_len:
 	lda	arg1+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	lda	arg1
 	sec
 	sbc	#$01
 	sta	Z6d
 	bcs	.fwd1
-	dec	Z6e
+	dec	Z6d+1
 .fwd1:	ldy	#$00
 	lda	(Z6d),y
 	bmi	.fwd3
@@ -3197,7 +3269,7 @@ op_print_addr:
 	lda	arg1
 	sta	Z6d
 	lda	arg1+1
-	sta	Z6e
+	sta	Z6d+1
 	jsr	Sf081
 	jmp	Sf307
 
@@ -3208,8 +3280,8 @@ op_remove_obj:
 	jsr	setup_object
 	lda	Z6d
 	sta	Z6f
-	lda	Z6e
-	sta	Z70
+	lda	Z6d+1
+	sta	Z6f+1
 	ldy	#$07
 	lda	(Z6d),y
 	sta	Z71
@@ -3279,10 +3351,10 @@ op_print_obj:
 	iny
 	lda	(Z6d),y
 	sta	Z6d
-	stx	Z6e
+	stx	Z6d+1
 	inc	Z6d
 	bne	.fwd1
-	inc	Z6e
+	inc	Z6d+1
 .fwd1:	jsr	Sf081
 	jmp	Sf307
 
@@ -3292,10 +3364,10 @@ op_ret:	lda	Zf2
 	lda	Zf2+1
 	sta	stk_ptr+1
 	jsr	pop_acc
-	stx	Z6e
+	stx	Z6d+1
 	jsr	pop_acc
 	sta	Dfdef
-	ldx	Z6e
+	ldx	Z6d+1
 	beq	.fwd1
 	dex
 	txa
@@ -3309,7 +3381,7 @@ op_ret:	lda	Zf2
 	sta	local_vars,y
 	dec	Z6d
 	dec	Z6d
-	dec	Z6e
+	dec	Z6d+1
 	bne	.loop1
 
 .fwd1:	jsr	pop_acc
@@ -3348,7 +3420,7 @@ op_print_paddr:
 	lda	arg1
 	sta	Z6d
 	lda	arg1+1
-	sta	Z6e
+	sta	Z6d+1
 	jsr	Sf2ee
 	jmp	Sf307
 
@@ -3368,14 +3440,14 @@ op_dec_chk:
 Le52e:	lda	arg2
 	sta	Z6d
 	lda	arg2+1
-	sta	Z6e
+	sta	Z6d+1
 	jmp	Le557
 
 
 op_jg:	lda	arg1
 	sta	Z6d
 	lda	arg1+1
-	sta	Z6e
+	sta	Z6d+1
 	jmp	Le54f
 
 
@@ -3384,21 +3456,21 @@ op_inc_chk:
 	lda	acc
 	sta	Z6d
 	lda	acc+1
-	sta	Z6e
+	sta	Z6d+1
 Le54f:	lda	arg2
 	sta	acc
 	lda	arg2+1
 	sta	acc+1
-Le557:	lda	Z6e
+Le557:	lda	Z6d+1
 	eor	acc+1
 	bpl	.fwd1
-	lda	Z6e
+	lda	Z6d+1
 	cmp	acc+1
 	bcc	Le59e
 	jmp	predicate_false
 
 .fwd1:	lda	acc+1
-	cmp	Z6e
+	cmp	Z6d+1
 	bne	.fwd2
 	lda	acc
 	cmp	Z6d
@@ -3453,12 +3525,12 @@ op_and:	lda	arg1
 
 op_test_attr:
 	jsr	setup_attribute
-	lda	Z72
-	and	Z70
-	sta	Z72
+	lda	Z71+1
+	and	Z6f+1
+	sta	Z71+1
 	lda	Z71
 	and	Z6f
-	ora	Z72
+	ora	Z71+1
 	bne	Le59e
 	jmp	predicate_false
 
@@ -3466,8 +3538,8 @@ op_test_attr:
 op_set_attr:
 	jsr	setup_attribute
 	ldy	#$00
-	lda	Z72
-	ora	Z70
+	lda	Z71+1
+	ora	Z6f+1
 	sta	(Z6d),y
 	iny
 	lda	Z71
@@ -3479,9 +3551,9 @@ op_set_attr:
 op_clear_attr:
 	jsr	setup_attribute
 	ldy	#$00
-	lda	Z70
+	lda	Z6f+1
 	eor	#$ff
-	and	Z72
+	and	Z71+1
 	sta	(Z6d),y
 	iny
 	lda	Z6f
@@ -3507,8 +3579,8 @@ op_insert_obj:
 	jsr	setup_object
 	lda	Z6d
 	sta	Z6f
-	lda	Z6e
-	sta	Z70
+	lda	Z6d+1
+	sta	Z6f+1
 	lda	arg2+1
 	ldy	#$06
 	sta	(Z6d),y
@@ -3519,7 +3591,7 @@ op_insert_obj:
 	jsr	setup_object
 	ldy	#$0a
 	lda	(Z6d),y
-	sta	Z72
+	sta	Z71+1
 	lda	arg1+1
 	sta	(Z6d),y
 	iny
@@ -3528,13 +3600,13 @@ op_insert_obj:
 	lda	arg1
 	sta	(Z6d),y
 	txa
-	ora	Z72
+	ora	Z71+1
 	beq	.rtn
 	txa
 	ldy	#$09
 	sta	(Z6f),y
 	dey
-	lda	Z72
+	lda	Z71+1
 	sta	(Z6f),y
 .rtn:	rts
 
@@ -3621,12 +3693,12 @@ op_get_prop_addr:
 	ldy	#$0c
 	lda	(Z6d),y
 	clc
-	adc	Z81
+	adc	first_ram_page
 	tax
 	iny
 	lda	(Z6d),y
 	sta	Z6d
-	stx	Z6e
+	stx	Z6d+1
 	ldy	#$00
 	lda	(Z6d),y
 	asl
@@ -3659,7 +3731,7 @@ op_get_prop_addr:
 .loop3b:
 	iny
 	bne	.fwd6b
-	inc	Z6e
+	inc	Z6d+1
 .fwd6b:	dex
 	bne	.loop3b
 	iny
@@ -3668,7 +3740,7 @@ op_get_prop_addr:
 	adc	Z6d
 	sta	Z6d
 	bcc	.fwd7b
-	inc	Z6e
+	inc	Z6d+1
 .fwd7b:	ldy	#$00
 	jmp	.loop2b
 
@@ -3694,10 +3766,10 @@ op_get_prop_addr:
 	clc
 	adc	Z6d
 	sta	acc
-	lda	Z6e
+	lda	Z6d+1
 	adc	#$00
 	sec
-	sbc	Z81
+	sbc	first_ram_page
 	sta	acc+1
 	jmp	store_result
 
@@ -3740,7 +3812,7 @@ op_sub:	lda	arg1
 
 
 op_mul:	jsr	Se849
-.loop1:	ror	Zd1
+.loop1:	ror	Zd0+1
 	ror	Zd0
 	ror	arg2+1
 	ror	arg2
@@ -3750,8 +3822,8 @@ op_mul:	jsr	Se849
 	adc	Zd0
 	sta	Zd0
 	lda	arg1+1
-	adc	Zd1
-	sta	Zd1
+	adc	Zd0+1
+	sta	Zd0+1
 .fwd1:	dex
 	bpl	.loop1
 	ldx	arg2
@@ -3825,23 +3897,23 @@ Se813:	lda	Zce
 .loop1:	rol	Zcc
 	rol	Zcc+1
 	rol	Zd0
-	rol	Zd1
+	rol	Zd0+1
 	lda	Zd0
 	sec
 	sbc	Zce
 	tay
-	lda	Zd1
+	lda	Zd0+1
 	sbc	Zce+1
 	bcc	.fwd1
 	sty	Zd0
-	sta	Zd1
+	sta	Zd0+1
 .fwd1:	dex
 	bne	.loop1
 	rol	Zcc
 	rol	Zcc+1
 	lda	Zd0
 	sta	Zce
-	lda	Zd1
+	lda	Zd0+1
 	sta	Zce+1
 	rts
 
@@ -3854,7 +3926,7 @@ int_err_08:
 Se849:	ldx	#$10
 	lda	#$00
 	sta	Zd0
-	sta	Zd1
+	sta	Zd0+1
 	clc
 	rts
 
@@ -3952,7 +4024,7 @@ do_call:
 	jsr	find_pc_page
 	jsr	fetch_pc_byte
 	sta	Z6f
-	sta	Z70
+	sta	Z6f+1
 	beq	.fwd2
 	lda	#$00
 	sta	Z6d
@@ -4027,7 +4099,7 @@ do_call:
 	lda	arg8+1
 	sta	local_vars+13
 
-.fwd3:	ldx	Z70
+.fwd3:	ldx	Z6f+1
 	txa
 	jsr	push_ax
 	lda	stk_ptr+1
@@ -4060,8 +4132,8 @@ Se99a:	lda	arg2
 	lda	arg2+1
 	adc	arg1+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	ldy	#$00
 	rts
 
@@ -4247,13 +4319,13 @@ op_scan_table:
 	jsr	find_aux_page
 .loop1:	lda	aux_ptr
 	fcb	$8d		; sta absolute
-	fdb	Z70
+	fdb	Z6f+1
 	lda	aux_ptr+1
 	fcb	$8d		; sta absolute
 	fdb	Z71
 	lda	aux_ptr+2
 	fcb	$8d		; sta absolute
-	fdb	Z72
+	fdb	Z71+1
 	jsr	fetch_aux_byte
 	cmp	arg1+1
 	bne	.fwd6
@@ -4263,7 +4335,7 @@ op_scan_table:
 	cmp	arg1
 	beq	.fwd4
 .fwd6:	fcb	$ad		; lda absolute
-	fdb	Z70
+	fdb	Z6f+1
 	clc
 	adc	arg4
 	sta	aux_ptr
@@ -4273,7 +4345,7 @@ op_scan_table:
 	adc	#$00
 	sta	aux_ptr+1
 	fcb	$ad		; lda absolute
-	fdb	Z72
+	fdb	Z71+1
 	adc	#$00
 	sta	aux_ptr+2
 	jsr	find_aux_page
@@ -4291,9 +4363,9 @@ op_scan_table:
 	jmp	predicate_false
 
 .fwd4:	fcb	$ad		; lda absolute
-	fdb	Z70
+	fdb	Z6f+1
 	sta	acc
-	fcb	$ad	; lda absolute
+	fcb	$ad		; lda absolute
 	fdb	Z71
 	sta	acc+1
 	jsr	store_result
@@ -4353,12 +4425,12 @@ op_copy_table:
 	sta	Z6d
 	lda	arg2+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	lda	arg3
 	sta	Z6f
 	lda	arg3+1
-	sta	Z70
+	sta	Z6f+1
 .loop1:	jsr	Sf0fb
 	bcc	.rtn
 	jsr	fetch_aux_byte
@@ -4366,7 +4438,7 @@ op_copy_table:
 	sta	(Z6d),y
 	inc	Z6d
 	bne	.loop1
-	inc	Z6e
+	inc	Z6d+1
 	jmp	.loop1
 
 .rtn:	rts
@@ -4374,36 +4446,36 @@ op_copy_table:
 .fwd6:	lda	arg3
 	sta	Z6f
 	lda	arg3+1
-	sta	Z70
+	sta	Z6f+1
 	jsr	Sf0fb
 	lda	arg1
 	clc
 	adc	Z6f
 	sta	Z6d
 	lda	arg1+1
-	adc	Z70
+	adc	Z6f+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	lda	arg2
 	clc
 	adc	Z6f
 	sta	Z71
 	lda	arg2+1
-	adc	Z70
+	adc	Z6f+1
 	clc
-	adc	Z81
-	sta	Z72
+	adc	first_ram_page
+	sta	Z71+1
 .loop2:	ldy	#$00
 	lda	(Z6d),y
 	sta	(Z71),y
 	lda	Z6d
 	bne	.fwd7
-	dec	Z6e
+	dec	Z6d+1
 .fwd7:	dec	Z6d
 	lda	Z71
 	bne	.fwd8
-	dec	Z72
+	dec	Z71+1
 .fwd8:	dec	Z71
 	jsr	Sf0fb
 	bcs	.loop2
@@ -4413,12 +4485,12 @@ op_copy_table:
 	sta	Z6d
 	lda	arg1+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	lda	arg3
 	sta	Z6f
 	lda	arg3+1
-	sta	Z70
+	sta	Z6f+1
 	ldy	#$00
 .loop3:	jsr	Sf0fb
 	bcc	.rtn2
@@ -4426,7 +4498,7 @@ op_copy_table:
 	sta	(Z6d),y
 	iny
 	bne	.loop3
-	inc	Z6e
+	inc	Z6d+1
 	jmp	.loop3
 
 .rtn2:	rts
@@ -4499,7 +4571,7 @@ op_art_shift:
 op_aread:
 	lda	arg1+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zc9
 	lda	arg1
 	sta	Zc8
@@ -4515,7 +4587,7 @@ op_aread:
 	beq	.fwd1
 	lda	arg2+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zcb
 	lda	arg2
 	sta	Zca
@@ -4633,13 +4705,13 @@ Secec:	ldy	#$01
 op_tokenise:
 	lda	arg1+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zc9
 	lda	arg1
 	sta	Zc8
 	lda	arg2+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zcb
 	lda	arg2
 	sta	Zca
@@ -4664,7 +4736,7 @@ op_tokenise:
 op_encode_text:
 	lda	arg1+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zc9
 	lda	arg1
 	sta	Zc8
@@ -4677,7 +4749,7 @@ op_encode_text:
 	sta	Zc9
 	lda	arg4+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	sta	Zcb
 	lda	arg4
 	sta	Zca
@@ -4796,7 +4868,7 @@ See9f:	lda	Zb3
 	sta	Za7
 	sta	Z6d
 	lda	#$00
-	sta	Z6e
+	sta	Z6d+1
 	sta	Z6f
 	jsr	fetch_aux_byte
 	sta	Za6
@@ -4843,7 +4915,7 @@ See9f:	lda	Zb3
 	lsr	Za6
 	ror	Za5
 .loop2:	asl	Z6d
-	rol	Z6e
+	rol	Z6d+1
 	rol	Z6f
 	lsr	Za6
 	ror	Za5
@@ -4853,7 +4925,7 @@ See9f:	lda	Zb3
 	adc	Z6d
 	sta	aux_ptr
 	lda	aux_ptr+1
-	adc	Z6e
+	adc	Z6d+1
 	sta	aux_ptr+1
 	lda	aux_ptr+2
 	adc	Z6f
@@ -4872,14 +4944,14 @@ See9f:	lda	Zb3
 	sbc	#$00
 	sta	aux_ptr+2
 .loop3:	lsr	Z6f
-	ror	Z6e
+	ror	Z6d+1
 	ror	Z6d
 	lda	aux_ptr
-	sta	Z70
+	sta	Z6f+1
 	lda	aux_ptr+1
 	sta	Z71
 	lda	aux_ptr+2
-	sta	Z72
+	sta	Z71+1
 	jsr	find_aux_page
 	jsr	fetch_aux_byte
 	cmp	Z96
@@ -4905,12 +4977,12 @@ See9f:	lda	Zb3
 	cmp	Z9b
 	beq	.fwd10
 	bcs	.fwd6
-.fwd2:	lda	Z70
+.fwd2:	lda	Z6f+1
 	clc
 	adc	Z6d
 	sta	aux_ptr
 	lda	Z71
-	adc	Z6e
+	adc	Z6d+1
 	bcs	.fwd5
 	sta	aux_ptr+1
 	lda	#$00
@@ -4933,19 +5005,19 @@ See9f:	lda	Zb3
 	sta	aux_ptr+2
 	jmp	.fwd7
 
-.fwd6:	lda	Z70
+.fwd6:	lda	Z6f+1
 	sec
 	sbc	Z6d
 	sta	aux_ptr
 	lda	Z71
-	sbc	Z6e
+	sbc	Z6d+1
 	sta	aux_ptr+1
-	lda	Z72
+	lda	Z71+1
 	sbc	Z6f
 	sta	aux_ptr+2
 .fwd7:	lda	Z6f
 	bne	.fwd8
-	lda	Z6e
+	lda	Z6d+1
 	bne	.fwd8
 	lda	Z6d
 	cmp	Za7
@@ -4957,7 +5029,7 @@ See9f:	lda	Zb3
 	sta	acc+1
 	rts
 
-.fwd10:	lda	Z70
+.fwd10:	lda	Z6f+1
 	sta	acc
 	lda	Z71
 	sta	acc+1
@@ -4973,11 +5045,11 @@ See9f:	lda	Zb3
 	bne	.loop4
 	inc	Za6
 .loop4:	lda	aux_ptr
-	sta	Z70
+	sta	Z6f+1
 	lda	aux_ptr+1
 	sta	Z71
 	lda	aux_ptr+2
-	sta	Z72
+	sta	Z71+1
 	jsr	fetch_aux_byte
 	cmp	Z96
 	bne	.fwd12
@@ -4996,7 +5068,7 @@ See9f:	lda	Zb3
 	jsr	fetch_aux_byte
 	cmp	Z9b
 	beq	.fwd10
-.fwd12:	lda	Z70
+.fwd12:	lda	Z6f+1
 	clc
 	adc	Za7
 	sta	aux_ptr
@@ -5017,7 +5089,7 @@ See9f:	lda	Zb3
 
 Sf081:	lda	Z6d
 	sta	aux_ptr
-	lda	Z6e
+	lda	Z6d+1
 	sta	aux_ptr+1
 	lda	#$00
 	sta	aux_ptr+2
@@ -5037,8 +5109,29 @@ Df099:	fcb	$00
 Df09a:	fcb	$00
 Df09b:	fcb	$00
 
+	if	iver>=iver_e
+Df0d4:	fcb	$00
+	endif
 
-Lf09c:	lda	hdr_length+1
+
+Lf09c:
+	if	iver>=iver_e
+
+; This 16-bit compare seems totally wrong. It compares the low byte first.
+
+	lda	hdr_high_mem
+	cmp	hdr_length
+	bcc	.fwd2
+	bne	.fwd1
+	lda	hdr_high_mem+1
+	cmp	hdr_length+1
+	bcc	.fwd2
+.fwd1	lda	#$01
+	sta	Df0d4
+.fwd2:
+	endif
+
+	lda	hdr_length+1
 	sta	Z6f
 	lda	hdr_length
 	ldy	#$05
@@ -5046,7 +5139,7 @@ Lf09c:	lda	hdr_length+1
 	ror	Z6f
 	dey
 	bpl	.loop1
-	sta	Z70
+	sta	Z6f+1
 .loop2:	jsr	Sf0fb
 	bcc	.rtn
 	jsr	Sd51d
@@ -5077,6 +5170,14 @@ Lf09c:	lda	hdr_length+1
 	jsr	Sdccf
 	lda	#$02
 	sta	cursrv
+
+	if	iver>=iver_e
+
+	lda	Df0d4
+	bne	.rtn
+
+	endif
+
 	jmp	Sd899
 
 .rtn:	rts
@@ -5086,9 +5187,9 @@ Sf0fb:	lda	Z6f
 	sec
 	sbc	#$01
 	sta	Z6f
-	lda	Z70
+	lda	Z6f+1
 	sbc	#$00
-	sta	Z70
+	sta	Z6f+1
 	rts
 
 
@@ -5105,6 +5206,7 @@ find_aux_page:
 .fwd1:	sbc	#$a5
 	ldy	#$01
 	bne	.fwd3		; always taken
+
 .fwd2:	cmp	#$01
 	bne	.fwd4
 	lda	aux_ptr+1
@@ -5371,7 +5473,7 @@ fetch_pc_byte:
 Sf2ee:	lda	Z6d
 	asl
 	sta	aux_ptr
-	lda	Z6e
+	lda	Z6d+1
 	rol
 	sta	aux_ptr+1
 	lda	#$00
@@ -5465,7 +5567,7 @@ Sf307:	ldx	#$00
 	adc	Zab
 	tay
 	lda	(Z87),y
-	sta	Z6e
+	sta	Z6d+1
 	iny
 	lda	(Z87),y
 	sta	Z6d
@@ -5518,7 +5620,7 @@ Sf3cf:	lda	Za9
 Sf3db:	lda	Z6d
 	asl
 	sta	aux_ptr
-	lda	Z6e
+	lda	Z6d+1
 	rol
 	sta	aux_ptr+1
 	lda	#$00
@@ -5732,35 +5834,35 @@ Df51e:	fcb	$00,char_cr
 
 
 setup_object:
-	stx	Z6e
+	stx	Z6d+1
 	asl
 	sta	Z6d
-	rol	Z6e
-	ldx	Z6e
+	rol	Z6d+1
+	ldx	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	sec
 	sbc	Z6d
 	sta	Z6d
-	lda	Z6e
-	stx	Z6e
-	sbc	Z6e
-	sta	Z6e
+	lda	Z6d+1
+	stx	Z6d+1
+	sbc	Z6d+1
+	sta	Z6d+1
 	lda	Z6d
 	clc
 	adc	#$70
 	bcc	.fwd1
-	inc	Z6e
+	inc	Z6d+1
 .fwd1:	clc
 	adc	Z89
 	sta	Z6d
-	lda	Z6e
+	lda	Z6d+1
 	adc	Z8a
-	sta	Z6e
+	sta	Z6d+1
 	rts
 
 
@@ -5770,12 +5872,12 @@ Sf56c:	lda	arg1
 	ldy	#$0c
 	lda	(Z6d),y
 	clc
-	adc	Z81
+	adc	first_ram_page
 	tax
 	iny
 	lda	(Z6d),y
 	sta	Z6d
-	stx	Z6e
+	stx	Z6d+1
 	ldy	#$00
 	lda	(Z6d),y
 	asl
@@ -5812,7 +5914,7 @@ Sf5a7:	jsr	Sf58f
 	bne	.fwd1
 	inc	Z6d
 	bne	.fwd1
-	inc	Z6e
+	inc	Z6d+1
 .fwd1:	dex
 	bne	.loop1
 	iny
@@ -5825,7 +5927,7 @@ Sf5b9:	jsr	Sf5a7
 	adc	Z6d
 	sta	Z6d
 	bcc	.fwd1
-	inc	Z6e
+	inc	Z6d+1
 .fwd1:	ldy	#$00
 	rts
 
@@ -5848,7 +5950,7 @@ setup_attribute:
 	adc	#$04
 	sta	Z6d
 	bcc	.fwd2
-	inc	Z6e
+	inc	Z6d+1
 	jmp	.fwd2
 
 .fwd1:	lda	Z6d
@@ -5856,25 +5958,25 @@ setup_attribute:
 	adc	#$02
 	sta	Z6d
 	bcc	.fwd2
-	inc	Z6e
+	inc	Z6d+1
 .fwd2:	txa
 .fwd3:	sta	Z71
 	ldx	#$01
 	stx	Z6f
 	dex
-	stx	Z70
+	stx	Z6f+1
 	lda	#$0f
 	sec
 	sbc	Z71
 	tax
 	beq	.fwd4
 .loop1:	asl	Z6f
-	rol	Z70
+	rol	Z6f+1
 	dex
 	bne	.loop1
 .fwd4:	ldy	#$00
 	lda	(Z6d),y
-	sta	Z72
+	sta	Z71+1
 	iny
 	lda	(Z6d),y
 	sta	Z71
@@ -5973,12 +6075,30 @@ Sf69a:	sta	Zdc
 	ora	#$80
 .fwd4:	ldx	Zd6
 	sta	D0200,x
+
+	if	iver<=iver_c
+
 	ldy	Zd5
 	cpy	Zc4
+
+	else
+
+	lda	Zc7
+	bne	.fwd5
+	ldy	Zd5
+	inc	Zd5
+	cpy	Zc4
+
+	endif
+
 	bcc	.fwd5
 	jmp	Lf742
 
-.fwd5:	inc	Zd5
+.fwd5:
+	if	iver<=iver_c
+	inc	Zd5
+	endif
+
 	inc	Zd6
 .rtn:	rts
 
@@ -6034,7 +6154,7 @@ Lf728:	tax
 	sta	Z6d
 	lda	Zbf
 	adc	Zbd
-	sta	Z6e
+	sta	Z6d+1
 	ldy	#$00
 	txa
 	sta	(Z6d),y
@@ -6150,7 +6270,7 @@ Sf7e4:	lda	hdr_os3_pixels_sent+1
 	lda	hdr_std_rev_num+1
 	sta	Z6f
 	lda	hdr_std_rev_num
-	sta	Z70
+	sta	Z6f+1
 	jsr	Sfcea
 Lf812:	rts
 
@@ -6171,14 +6291,14 @@ op_verify:
 	lda	#$40
 	sta	aux_ptr
 	lda	hdr_length
-	sta	Z6e
+	sta	Z6d+1
 	lda	hdr_length+1
 	asl
-	rol	Z6e
+	rol	Z6d+1
 	rol	Z71
 	asl
 	sta	Z6d
-	rol	Z6e
+	rol	Z6d+1
 	rol	Z71
 	lda	#$00
 	sta	disk_block_num
@@ -6210,12 +6330,12 @@ op_verify:
 	adc	Z73
 	sta	Z73
 	bcc	.fwd4
-	inc	Z74
+	inc	Z73+1
 .fwd4:	lda	aux_ptr
 	cmp	Z6d
 	bne	.loop2
 	lda	aux_ptr+1
-	cmp	Z6e
+	cmp	Z6d+1
 	bne	.loop2
 	lda	aux_ptr+2
 	cmp	Z71
@@ -6224,7 +6344,7 @@ op_verify:
 	cmp	Z73
 	bne	.rtn_f
 	lda	hdr_checksum
-	cmp	Z74
+	cmp	Z73+1
 	bne	.rtn_f
 	jmp	predicate_true
 
@@ -6326,7 +6446,7 @@ ostream_select_3:
 	stx	ostream_3_state
 	lda	arg2+1
 	clc
-	adc	Z81
+	adc	first_ram_page
 	ldx	arg2
 	stx	Zbc
 	sta	Zbd
@@ -6346,7 +6466,7 @@ osteram_deselect_3:
 	sta	Z6d
 	lda	Zbf
 	adc	Zbd
-	sta	Z6e
+	sta	Z6d+1
 	lda	#$00
 	tay
 	sta	(Z6d),y
@@ -6387,8 +6507,8 @@ op_get_cursor:
 	sta	Z6d
 	lda	arg1+1
 	clc
-	adc	Z81
-	sta	Z6e
+	adc	first_ram_page
+	sta	Z6d+1
 	ldy	cursrv
 	ldx	D057b
 	inx
@@ -6413,6 +6533,10 @@ op_input_stream:
 
 
 op_set_text_style:
+	if	iver>=iver_e
+	jsr	Sf8e1
+	endif
+
 	lda	arg1
 	bne	.fwd1
 	lda	#$ff
@@ -6442,7 +6566,7 @@ op_erase_window:
 	fdb	Z6d
 	lda	D057b
 	fcb	$8d		; sta absolute
-	fdb	Z6e
+	fdb	Z6d+1
 	lda	cursrv
 	fcb	$8d		; sta absolute
 	fdb	Z73
@@ -6482,7 +6606,7 @@ op_erase_window:
 	fcb	$ad		; lda absolute
 	fdb	Z6d
 	fcb	$ad		; lda absolute
-	fdb	Z6e
+	fdb	Z6d+1
 	sta	D057b
 	fcb	$ad		; lda absolute
 	fdb	Z73
@@ -6504,7 +6628,7 @@ op_print_table:
 	lda	arg2
 	cmp	#$00
 	beq	.rtn
-	sta	Z70
+	sta	Z6f+1
 	sta	Z6f
 	dec	argcnt
 	lda	argcnt
@@ -6515,7 +6639,7 @@ op_print_table:
 	lda	cursrh
 	sta	Z6d
 	lda	D057b
-	sta	Z6e
+	sta	Z6d+1
 	lda	cursrv
 	sta	Z73
 .loop1:	jsr	fetch_aux_byte
@@ -6525,14 +6649,14 @@ op_print_table:
 	dec	Z71
 	beq	.rtn
 	lda	Z6d
-	lda	Z6e
+	lda	Z6d+1
 	sta	D057b
 	ldx	Z73
 	inx
 	stx	Z73
 	stx	cursrv
 	jsr	S08a9
-	lda	Z70
+	lda	Z6f+1
 	sta	Z6f
 	jmp	.loop1
 
@@ -6585,9 +6709,9 @@ Sfab4:	ldx	romid2_save
 
 Sfada:	jsr	Sf8e1
 	lda	#$00
-	sta	Z6e
+	sta	Z6d+1
 	sta	Z6d
-	sta	Z70
+	sta	Z6f+1
 	sta	Z6f
 	sta	Dfdf0
 	ldy	wndtop
@@ -6610,7 +6734,7 @@ Sfada:	jsr	Sf8e1
 	inx
 	stx	Dfde3
 	jsr	Sfbbe
-.loop1:	lda	Z6e
+.loop1:	lda	Z6d+1
 	beq	.fwd2
 	jsr	Sfc54
 	bcc	.fwd3
@@ -6713,14 +6837,14 @@ Sfbbe:	lda	argcnt
 	cmp	#$02
 	beq	.ret
 	lda	arg3
-	sta	Z6e
+	sta	Z6d+1
 	lda	argcnt
 	cmp	#$04
 	bne	.ret
 	lda	arg4
 	sta	Z6f
 	lda	arg4+1
-	sta	Z70
+	sta	Z6f+1
 .ret:	rts
 
 
@@ -6728,7 +6852,7 @@ Sfbd7:	bit	kbd_strb
 .loop1:	jsr	Sfc33
 	lda	Z6d
 	bne	.loop2
-	lda	Z6e
+	lda	Z6d+1
 	sta	Z6d
 .loop2:	ldx	#$08
 .loop3:	lda	#$30
@@ -6741,7 +6865,7 @@ Sfbd7:	bit	kbd_strb
 	beq	.fwd1
 	bne	.loop2
 .fwd1:	jsr	Sfc47
-	lda	Z70
+	lda	Z6f+1
 	beq	.rtn_cs
 	jsr	Sfcea
 	lda	acc
@@ -6873,20 +6997,20 @@ op_read_char:
 
 	lda	#$00
 	sta	Zd6
-	sta	Z6e
+	sta	Z6d+1
 	sta	Z6d
-	sta	Z70
+	sta	Z6f+1
 	sta	Z6f
 	dec	argcnt
 	beq	.fwd2
 	lda	arg2
-	sta	Z6e
+	sta	Z6d+1
 	dec	argcnt
 	beq	.fwd1
 	lda	arg3
 	sta	Z6f
 	lda	arg3+1
-	sta	Z70
+	sta	Z6f+1
 .fwd1:	jsr	Sfc54
 	bcs	.fwd4
 	bcc	.fwd3
@@ -6897,11 +7021,11 @@ op_read_char:
 .fwd4:	jmp	store_result_zero
 
 
-Sfcea:	lda	Z6e
+Sfcea:	lda	Z6d+1
 	pha
 	lda	Z6d
 	pha
-	lda	Z70
+	lda	Z6f+1
 	sta	arg1+1
 	pha
 	lda	Z6f
@@ -6937,11 +7061,11 @@ Lfd19:	pla
 	pla
 	sta	Z6f
 	pla
-	sta	Z70
+	sta	Z6f+1
 	pla
 	sta	Z6d
 	pla
-	sta	Z6e
+	sta	Z6d+1
 	rts
 
 
@@ -7050,6 +7174,11 @@ Dfde9:	fcb	$00
 Dfdea:	fcb	$00
 Dfdeb:	fcb	$00,$00
 Dfded:	fcb	$00
+
+	if	iver>=iver_e
+Zd0:	fdb	$0000
+	endif
+
 Dfdee:	fcb	$00
 Dfdef:	fcb	$00
 Dfdf0:	fcb	$00

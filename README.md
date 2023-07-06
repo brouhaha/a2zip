@@ -109,7 +109,7 @@ There were five revisions of the Apple II XZIP interpreter, A, C, E,
 F, and H. The platform number will be reported as 2, except when using
 an Apple IIc, which will be reported as 9.
 
-Early work on reverse-engineering XZIP interpreter revisions A and C
+Early work on reverse-engineering XZIP interpreter revisions A, C, and E
 are present in the source file "xzip.asm". This does not use an
 include file for macro definitions.
 
