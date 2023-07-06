@@ -6414,7 +6414,10 @@ ostream_select_1:
 	rts
 
 ostream_deselect_1:
+	if	iver<=iver_e
 	jsr	Sf8e1
+	endif
+
 	stx	ostream_1_state
 	rts
 
@@ -6617,8 +6620,13 @@ op_erase_window:
 
 
 op_print_table:
+	if	iver>=iver_f
+	lda	Zc7
+	beq	.fwd0
+	endif
+
 	jsr	Sf8e1
-	lda	arg1
+.fwd0:	lda	arg1
 	sta	aux_ptr
 	lda	arg1+1
 	sta	aux_ptr+1
@@ -6643,12 +6651,22 @@ op_print_table:
 	lda	cursrv
 	sta	Z73
 .loop1:	jsr	fetch_aux_byte
+
+	if	iver<=iver_e
 	jsr	Sf6d6
+	else
+	jsr	Sf69a
+	endif
+
 	dec	Z6f
 	bne	.loop1
 	dec	Z71
 	beq	.rtn
+
+	if	iver<=iver_e
 	lda	Z6d
+	endif
+
 	lda	Z6d+1
 	sta	D057b
 	ldx	Z73

@@ -14,7 +14,8 @@ all: zip1.lst  zip1.bin  zip1-check \
      ezip2h.lst ezip2h.bin ezip2h-check \
      xzip2a.lst xzip2a.bin xzip2a-check \
      xzip2c.lst xzip2c.bin xzip2c-check \
-     xzip2e.lst xzip2e.bin xzip2e-check
+     xzip2e.lst xzip2e.bin xzip2e-check \
+     xzip2f.lst xzip2f.bin xzip2f-check
 
 
 %.p %.lst: %.asm
@@ -191,10 +192,20 @@ xzip2e-check: xzip2e.bin
 	echo "23bc1c8363c2ce30d96f87db666fde44b7542166c2df812444ae096bf8271e89 xzip2e.bin" | sha256sum -c
 
 
+xzip2f.p xzip2f.lst: xzip.asm
+	asl xzip.asm -o xzip2f.p -L -OLIST xzip2f.lst -D iver='$$0506'
+
+xzip2f.bin: xzip2f.p
+	p2bin -r '$$d000-$$feff' xzip2f.p
+
+xzip2f-check: xzip2f.bin
+	echo "1df3dc06b9bbf9876a21ea67fa394bbbb44ca743b61380e9238a71e3bc2ec33d xzip2f.bin" | sha256sum -c
+
+
 clean:
 	rm -f zip{1,2,3,3a,3b}.{p,lst,bin}
 	rm -f ezip2{a,b,c,d,h}.{p,lst,bin}
-	rm -f xzip2{a,c,e}.{p,lst,bin}
+	rm -f xzip2{a,c,e,f}.{p,lst,bin}
 
 
 .PRECIOUS: %.lst
